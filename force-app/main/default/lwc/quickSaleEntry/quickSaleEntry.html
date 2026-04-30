@@ -1,0 +1,339 @@
+<template>
+    <!-- BUTTON ON ACCOUNT PAGE — triggers modal -->
+    <template if:false={isOpen}>
+        <lightning-button
+            label="New Sale"
+            icon-name="utility:add"
+            variant="brand"
+            onclick={openModal}
+            class="slds-m-around_small">
+        </lightning-button>
+    </template>
+
+    <!-- MODAL -->
+    <template if:true={isOpen}>
+        <div class="modal-backdrop" onclick={handleBackdropClick}>
+        </div>
+        <div class="modal-container">
+
+            <!-- HEADER -->
+            <div class="modal-header">
+                <div class="header-left">
+                    <span class="header-icon">🛒</span>
+                    <div>
+                        <div class="header-title">New Sale</div>
+                        <div class="header-sub"
+                            if:true={clientName}>
+                            {clientName}
+                        </div>
+                    </div>
+                </div>
+                <button class="close-btn"
+                    onclick={closeModal}>✕</button>
+            </div>
+
+            <!-- SCROLLABLE BODY -->
+            <div class="modal-body">
+
+                <!-- SALE DETAILS SECTION -->
+                <div class="section-card">
+                    <div class="section-title">
+                        📋 Sale Details
+                    </div>
+
+                    <div class="field-group">
+                        <label class="field-label">
+                            Sale Date *
+                        </label>
+                        <input
+                            type="date"
+                            class="field-input"
+                            value={saleDate}
+                            onchange={handleSaleDate}>
+                    </div>
+
+                    <div class="field-group">
+                        <label class="field-label">
+                            Order Status
+                        </label>
+                        <select class="field-input"
+                            onchange={handleStatus}>
+                            <template for:each={statusOptions}
+                                for:item="opt">
+                                <option key={opt}
+                                    value={opt}>{opt}
+                                </option>
+                            </template>
+                        </select>
+                    </div>
+
+                    <div class="field-group">
+                        <label class="field-label">
+                            Regional Manager
+                        </label>
+                        <select class="field-input"
+                            onchange={handleManager}>
+                            <option value="">— Select —
+                            </option>
+                            <template for:each={managerOptions}
+                                for:item="opt">
+                                <option key={opt}
+                                    value={opt}>{opt}
+                                </option>
+                            </template>
+                        </select>
+                    </div>
+
+                    <div class="field-group">
+                        <label class="field-label">Notes
+                        </label>
+                        <textarea
+                            class="field-input field-textarea"
+                            placeholder="Any remarks..."
+                            onchange={handleNotes}>
+                        </textarea>
+                    </div>
+                </div>
+
+                <!-- STOCK LEVELS -->
+                <div class="section-card">
+                    <div class="section-title">
+                        📦 Available Stock
+                    </div>
+                    <template if:true={inventory}>
+                        <div class="stock-grid">
+                            <template
+                                for:each={inventory}
+                                for:item="inv">
+                                <div key={inv.Id}
+                                    class={inv.stockClass}>
+                                    <div class="stock-brand">
+                                        {inv.Brand__c}
+                                    </div>
+                                    <div class="stock-type">
+                                        {inv.Packet_Type__c}
+                                    </div>
+                                    <div class="stock-qty">
+                                        {inv.Remaining_Quantity__c} KG
+                                    </div>
+                                    <div class="stock-packets">
+                                        {inv.Packet_Count__c} pkts
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- LINE ITEMS SECTION -->
+                <div class="section-card">
+                    <div class="section-title-row">
+                        <div class="section-title">
+                            🏷️ Line Items
+                        </div>
+                        <button class="add-btn"
+                            onclick={addLineItem}>
+                            + Add Brand
+                        </button>
+                    </div>
+
+                    <template if:true={hasLineItems}>
+                        <template for:each={lineItems}
+                            for:item="li" for:index="idx">
+                            <div key={li.key}
+                                class="line-item-card">
+                                <div class="li-header">
+                                    <span class="li-num">
+                                        #{li.displayIndex}
+                                    </span>
+                                    <button
+                                        class="remove-btn"
+                                        data-index={idx}
+                                        onclick={removeLineItem}>
+                                        ✕
+                                    </button>
+                                </div>
+
+                                <div class="li-row">
+                                    <div class="li-field">
+                                        <label class="field-label">
+                                            Brand *
+                                        </label>
+                                        <select
+                                            class="field-input"
+                                            data-index={idx}
+                                            data-field="brand"
+                                            onchange={handleLineItemChange}>
+                                            <option value="">
+                                                — Select Brand —
+                                            </option>
+                                            <template
+                                                for:each={brandOptions}
+                                                for:item="b">
+                                                <option
+                                                    key={b}
+                                                    value={b}>
+                                                    {b}
+                                                </option>
+                                            </template>
+                                        </select>
+                                    </div>
+                                    <div class="li-field">
+                                        <label class="field-label">
+                                            Packet Type *
+                                        </label>
+                                        <select
+                                            class="field-input"
+                                            data-index={idx}
+                                            data-field="packetType"
+                                            onchange={handleLineItemChange}>
+                                            <option value="">
+                                                — Select —
+                                            </option>
+                                            <template
+                                                for:each={packetTypeOptions}
+                                                for:item="pt">
+                                                <option
+                                                    key={pt}
+                                                    value={pt}>
+                                                    {pt}
+                                                </option>
+                                            </template>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="li-row">
+                                    <div class="li-field">
+                                        <label class="field-label">
+                                            Qty (KG) *
+                                        </label>
+                                        <input
+                                            type="number"
+                                            class="field-input"
+                                            placeholder="0.00"
+                                            min="0"
+                                            step="0.5"
+                                            data-index={idx}
+                                            data-field="quantity"
+                                            onchange={handleLineItemChange}>
+                                    </div>
+                                    <div class="li-field">
+                                        <label class="field-label">
+                                            Rate/KG (₹) *
+                                        </label>
+                                        <input
+                                            type="number"
+                                            class="field-input"
+                                            placeholder="0.00"
+                                            min="0"
+                                            data-index={idx}
+                                            data-field="rate"
+                                            onchange={handleLineItemChange}>
+                                    </div>
+                                </div>
+
+                                <div class="li-row li-bottom">
+                                    <div class="gst-row">
+                                        <input
+                                            type="checkbox"
+                                            class="gst-check"
+                                            data-index={idx}
+                                            data-field="gst"
+                                            onchange={handleLineItemChange}>
+                                        <label class="gst-label">
+                                            5% GST Applied
+                                        </label>
+                                    </div>
+                                    <div class="li-total">
+                                        ₹{li.lineTotal}
+                                    </div>
+                                </div>
+
+                                <!-- STOCK WARNING -->
+                                <template if:true={li.stockWarning}>
+                                    <div class="stock-warning">
+                                        ⚠️ {li.stockWarning}
+                                    </div>
+                                </template>
+
+                                <!-- AVAILABLE STOCK HINT -->
+                                <template if:true={li.availableStock}>
+                                    <div class="stock-hint">
+                                        Available: {li.availableStock} KG
+                                    </div>
+                                </template>
+
+                            </div>
+                        </template>
+                    </template>
+
+                    <template if:false={hasLineItems}>
+                        <div class="empty-state">
+                            Tap "+ Add Brand" to add products
+                        </div>
+                    </template>
+                </div>
+
+                <!-- ORDER SUMMARY -->
+                <template if:true={hasLineItems}>
+                    <div class="summary-card">
+                        <div class="summary-row">
+                            <span class="summary-label">
+                                Total Revenue
+                            </span>
+                            <span class="summary-value">
+                                ₹{totalRevenue}
+                            </span>
+                        </div>
+                        <div class="summary-row"
+                            if:true={totalGST}>
+                            <span class="summary-label">
+                                GST Amount
+                            </span>
+                            <span class="summary-value">
+                                ₹{totalGST}
+                            </span>
+                        </div>
+                        <div class="summary-row summary-total">
+                            <span class="summary-label">
+                                Grand Total
+                            </span>
+                            <span class="summary-value grand">
+                                ₹{grandTotal}
+                            </span>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- ERROR MESSAGE -->
+                <template if:true={errorMessage}>
+                    <div class="error-box">
+                        ⚠️ {errorMessage}
+                    </div>
+                </template>
+
+            </div>
+
+            <!-- FOOTER -->
+            <div class="modal-footer">
+                <button class="btn-cancel"
+                    onclick={closeModal}>
+                    Cancel
+                </button>
+                <button
+                    class="btn-save"
+                    onclick={handleSave}
+                    disabled={isSaving}>
+                    <template if:false={isSaving}>
+                        ✓ Save Sale
+                    </template>
+                    <template if:true={isSaving}>
+                        Saving...
+                    </template>
+                </button>
+            </div>
+
+        </div>
+    </template>
+</template>
