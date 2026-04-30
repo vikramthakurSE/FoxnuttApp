@@ -39,7 +39,6 @@ export default class QuickSaleEntry extends NavigationMixin(
     @track managerOptions = [];
     @track inventory = [];
 
-
     // Wire inventory
     @wire(getInventory)
     wiredInventory({ error, data }) {
