@@ -173,3 +173,45 @@
 .grand-total-bar { background:#0f172a; border-radius:12px; padding:14px 18px; display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
 .gt-label { font-size:13px; color:#94a3b8; font-weight:500; }
 .gt-amount { font-size:22px; font-weight:900; color:#f5a623; }
+
+/* Status button states */
+.sc-active {
+    box-shadow: 0 0 0 2.5px currentColor;
+    font-weight: 800;
+}
+.sc-disabled {
+    opacity: .38;
+    cursor: not-allowed;
+}
+.sc-btn:disabled {
+    cursor: not-allowed;
+    pointer-events: none;
+}
+/* Cancelled sale badge */
+.badge-cancelled {
+    background: #f3f4f6;
+    color: #9ca3af;
+}
+
+/* Cancelled sale notice */
+.cancelled-notice {
+    text-align: center;
+    padding: 10px 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #9ca3af;
+    background: #f9fafb;
+    border-radius: 8px;
+}
+.cancelled-btn {
+    background: #f3f4f6 !important;
+    color: #9ca3af !important;
+    cursor: default;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    padding: 12px;
+    font-size: 13px;
+    font-weight: 600;
+}
