@@ -1,0 +1,315 @@
+<template>
+<div class="page">
+
+    <!-- LOG EXPENSE MODAL -->
+    <template if:true={isExpenseOpen}>
+        <div class="modal-backdrop" onclick={closeExpense}></div>
+        <div class="modal-sheet">
+            <div class="modal-handle"></div>
+            <div class="modal-header exp-header">
+                <div class="modal-title-wrap">
+                    <div class="modal-title">Log Expense</div>
+                    <div class="modal-sub">
+                        Deducted from person's available funds
+                    </div>
+                </div>
+                <button class="modal-close"
+                    onclick={closeExpense}>&#10005;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label class="form-label">Amount (&#8377;) *</label>
+                        <input type="number" class="form-input"
+                            placeholder="0.00" min="0"
+                            value={expAmount}
+                            onchange={onExpAmount}>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Date *</label>
+                        <input type="date" class="form-input"
+                            value={expDate}
+                            onchange={onExpDate}>
+                    </div>
+                </div>
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label class="form-label">
+                            Expense Type *
+                        </label>
+                        <select class="form-input"
+                            onchange={onExpType}>
+                            <option value="">-- Select --</option>
+                            <template for:each={expenseTypes}
+                                for:item="t">
+                                <option key={t} value={t}>
+                                    {t}
+                                </option>
+                            </template>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Spent By *</label>
+                        <select class="form-input"
+                            onchange={onExpSpentBy}>
+                            <option value="">-- Select --</option>
+                            <template for:each={teamMembers}
+                                for:item="m">
+                                <option key={m} value={m}>
+                                    {m}
+                                </option>
+                            </template>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <textarea class="form-input form-textarea"
+                        placeholder="What was this expense for?"
+                        onchange={onExpDesc}></textarea>
+                </div>
+                <template if:true={expenseError}>
+                    <div class="form-error">
+                        &#9888; {expenseError}
+                    </div>
+                </template>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel"
+                    onclick={closeExpense}>Cancel</button>
+                <button class="btn-save exp-save-btn"
+                    onclick={handleExpenseSave}
+                    disabled={isExpSaving}>
+                    {expSaveLabel}
+                </button>
+            </div>
+        </div>
+    </template>
+
+    <!-- EXPENSE HISTORY MODAL -->
+    <template if:true={isHistoryOpen}>
+        <div class="modal-backdrop" onclick={closeHistory}></div>
+        <div class="modal-sheet">
+            <div class="modal-handle"></div>
+            <div class="modal-header hist-header">
+                <div class="modal-title-wrap">
+                    <div class="modal-title">
+                        {historyPerson}'s Expenses
+                    </div>
+                    <div class="modal-sub">Full history</div>
+                </div>
+                <button class="modal-close"
+                    onclick={closeHistory}>&#10005;</button>
+            </div>
+            <div class="modal-body">
+                <template if:true={isHistoryLoading}>
+                    <div class="loading-wrap">
+                        <div class="spinner"></div>
+                    </div>
+                </template>
+                <template if:false={isHistoryLoading}>
+                    <template if:true={noExpenseHistory}>
+                        <div class="empty-wrap">
+                            <div class="empty-icon">&#128179;</div>
+                            <div class="empty-title">
+                                No expenses yet
+                            </div>
+                        </div>
+                    </template>
+                    <template for:each={expenseHistory}
+                        for:item="e">
+                        <div key={e.Id} class="hist-card">
+                            <div class="hist-left">
+                                <div class="hist-type">
+                                    {e.Expense_Type__c}
+                                </div>
+                                <div class="hist-meta">
+                                    {e.formattedDate}
+                                    <template if:true={e.Description__c}>
+                                        &middot; {e.Description__c}
+                                    </template>
+                                </div>
+                            </div>
+                            <div class="hist-right">
+                                <div class="hist-amt">
+                                    -&#8377;{e.formattedAmt}
+                                </div>
+                                <template if:true={e.Is_Reimbursed__c}>
+                                    <div class="reimb-badge">
+                                        Reimbursed
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+                </template>
+            </div>
+        </div>
+    </template>
+
+    <!-- HEADER -->
+    <div class="pf-header">
+        <div class="pf-title">Person Funds</div>
+        <div class="pf-subtitle">Cash position per team member</div>
+    </div>
+
+    <!-- LOADING -->
+    <template if:true={isLoading}>
+        <div class="loading-wrap" style="padding:60px 20px;">
+            <div class="spinner"></div>
+            <div class="loading-text">Loading funds...</div>
+        </div>
+    </template>
+
+    <template if:false={isLoading}>
+
+        <!-- TEAM TOTAL CARD -->
+        <div class="team-card">
+            <div class="tc-label">Total Available — Team</div>
+            <div class="tc-amount">&#8377;{teamAvailable}</div>
+            <div class="tc-formula">
+                <div class="tcf-item">
+                    <div class="tcf-val green">
+                        &#8377;{teamCollected}
+                    </div>
+                    <div class="tcf-label">Collected</div>
+                </div>
+                <div class="tcf-sep">−</div>
+                <div class="tcf-item">
+                    <div class="tcf-val red">
+                        &#8377;{teamMfrPaid}
+                    </div>
+                    <div class="tcf-label">Paid Mfr</div>
+                </div>
+                <div class="tcf-sep">−</div>
+                <div class="tcf-item">
+                    <div class="tcf-val red">
+                        &#8377;{teamExpenses}
+                    </div>
+                    <div class="tcf-label">Expenses</div>
+                </div>
+                <div class="tcf-sep">=</div>
+                <div class="tcf-item">
+                    <div class="tcf-val amber">
+                        &#8377;{teamAvailable}
+                    </div>
+                    <div class="tcf-label">Available</div>
+                </div>
+            </div>
+            <div class="tc-updated">
+                Updated {teamLastUpdated}
+            </div>
+        </div>
+
+        <!-- LOG EXPENSE BUTTON -->
+        <div class="log-wrap">
+            <button class="log-btn" onclick={openExpense}>
+                <span class="log-icon">+</span>
+                <span class="log-text">Log Expense</span>
+                <span class="log-arrow">&#8594;</span>
+            </button>
+        </div>
+
+        <!-- PERSON CARDS -->
+        <div class="people-section-label">By Team Member</div>
+
+        <template if:true={noPeople}>
+            <div class="empty-wrap">
+                <div class="empty-icon">&#128101;</div>
+                <div class="empty-title">
+                    No Person Fund records found
+                </div>
+                <div class="empty-sub">
+                    Create a Person_Fund__c record for each
+                    team member in Salesforce
+                </div>
+            </div>
+        </template>
+
+        <template for:each={personFunds} for:item="pf">
+            <div key={pf.Id} class="person-card">
+
+                <!-- Top row -->
+                <div class="pc-top">
+                    <div class="pc-avatar">{pf.initial}</div>
+                    <div class="pc-info">
+                        <div class="pc-name">{pf.Name}</div>
+                        <div class="pc-date">
+                            Updated {pf.formattedDate}
+                        </div>
+                    </div>
+                    <div class="pc-avail">
+                        <div class="pc-avail-label">Available</div>
+                        <div class={pf.availClass}>
+                            &#8377;{pf.formattedAvail}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Metrics -->
+                <div class="pc-metrics">
+                    <div class="pcm">
+                        <div class="pcm-val green">
+                            &#8377;{pf.formattedCollected}
+                        </div>
+                        <div class="pcm-label">Collected</div>
+                    </div>
+                    <div class="pcm">
+                        <div class="pcm-val red">
+                            &#8377;{pf.formattedMfrPaid}
+                        </div>
+                        <div class="pcm-label">Paid Mfr</div>
+                    </div>
+                    <div class="pcm">
+                        <div class="pcm-val red">
+                            &#8377;{pf.formattedExpenses}
+                        </div>
+                        <div class="pcm-label">Expenses</div>
+                    </div>
+                </div>
+
+                <!-- Recent transactions -->
+                <template if:true={pf.hasTransactions}>
+                    <div class="pc-txns">
+                        <div class="pc-txns-label">
+                            Recent Activity
+                        </div>
+                        <template for:each={pf.transactions}
+                            for:item="t">
+                            <div key={t.key} class="txn-row">
+                                <div class={t.iconClass}>
+                                    {t.icon}
+                                </div>
+                                <div class="txn-info">
+                                    <div class="txn-title">
+                                        {t.title}
+                                    </div>
+                                    <div class="txn-meta">
+                                        {t.meta}
+                                    </div>
+                                </div>
+                                <div class={t.amtClass}>
+                                    {t.amtDisplay}
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+
+                <!-- Footer -->
+                <div class="pc-footer">
+                    <button class="view-exp-btn"
+                        data-person={pf.Name}
+                        onclick={openHistory}>
+                        &#128179; View All Expenses
+                    </button>
+                </div>
+
+            </div>
+        </template>
+
+    </template>
+
+    <div class="bottom-space"></div>
+</div>
+</template>

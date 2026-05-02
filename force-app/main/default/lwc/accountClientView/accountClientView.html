@@ -1,0 +1,412 @@
+<template>
+
+    <!-- PAYMENT MODAL — at top for mobile visibility -->
+    <template if:true={isPaymentOpen}>
+        <div class="modal-backdrop" onclick={closePaymentModal}></div>
+        <div class="modal-sheet">
+            <div class="modal-handle"></div>
+            <div class="modal-header pay-modal-header">
+                <div class="modal-title-wrap">
+                    <div class="modal-title">Log Payment</div>
+                    <div class="modal-sub">
+                        {paymentSaleName} &middot; Due: &#8377;{paymentBalance}
+                    </div>
+                </div>
+                <button class="modal-close" onclick={closePaymentModal}>&#10005;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label class="form-label">Amount (&#8377;) *</label>
+                        <input type="number" class="form-input"
+                            value={paymentAmount} min="0" placeholder="0.00"
+                            onchange={onPaymentAmount}>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Date *</label>
+                        <input type="date" class="form-input"
+                            value={paymentDate} onchange={onPaymentDate}>
+                    </div>
+                </div>
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label class="form-label">Mode *</label>
+                        <select class="form-input" onchange={onPaymentMode}>
+                            <template for:each={paymentModes} for:item="m">
+                                <option key={m} value={m}>{m}</option>
+                            </template>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Accepted By *</label>
+                        <select class="form-input" onchange={onPaymentBy}>
+                            <option value="">-- Select --</option>
+                            <template for:each={managerOptions} for:item="m">
+                                <option key={m} value={m}>{m}</option>
+                            </template>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Reference / UTR</label>
+                    <input type="text" class="form-input"
+                        placeholder="Optional" onchange={onPaymentRef}>
+                </div>
+                <template if:true={paymentError}>
+                    <div class="form-error">&#9888; {paymentError}</div>
+                </template>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-cancel" onclick={closePaymentModal}>Cancel</button>
+                <button class="modal-save pay-save-btn"
+                    onclick={handlePaymentSave} disabled={isPaymentSaving}>
+                    {paymentSaveLabel}
+                </button>
+            </div>
+        </div>
+    </template>
+
+    <!-- NEW SALE MODAL — at top for mobile visibility -->
+    <template if:true={isSaleOpen}>
+        <div class="modal-backdrop" onclick={closeSaleModal}></div>
+        <div class="modal-sheet">
+            <div class="modal-handle"></div>
+            <div class="modal-header sale-modal-header">
+                <div class="modal-title-wrap">
+                    <div class="modal-title">New Sale</div>
+                    <div class="modal-sub">{accountName}</div>
+                </div>
+                <button class="modal-close" onclick={closeSaleModal}>&#10005;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label class="form-label">Date *</label>
+                        <input type="date" class="form-input"
+                            value={saleDate} onchange={onSaleDate}>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Manager</label>
+                        <select class="form-input" onchange={onManager}>
+                            <option value="">-- Select --</option>
+                            <template for:each={managerOptions} for:item="m">
+                                <option key={m} value={m}>{m}</option>
+                            </template>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Order Status</label>
+                    <select class="form-input" onchange={onStatus}>
+                        <template for:each={statusOptions} for:item="s">
+                            <option key={s} value={s}>{s}</option>
+                        </template>
+                    </select>
+                </div>
+
+                <!-- Live Stock -->
+                <div class="stock-scroll-wrap">
+                    <div class="stock-scroll-title">Live Stock</div>
+                    <div class="stock-scroll">
+                        <template for:each={inventory} for:item="inv">
+                            <div key={inv.Id} class={inv.stockPillClass}>
+                                <div class="sp-brand">{inv.Brand__c}</div>
+                                <div class="sp-type">{inv.Packet_Type__c}</div>
+                                <div class="sp-qty">{inv.Remaining_Quantity__c}kg</div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- Line Items -->
+                <div class="li-builder">
+                    <div class="li-builder-head">
+                        <div class="li-builder-title">Products</div>
+                        <button class="li-add-btn" onclick={addLineItem}>+ Add</button>
+                    </div>
+                    <template for:each={lineItems} for:item="li" for:index="idx">
+                        <div key={li.key} class="li-builder-item">
+                            <div class="lib-top">
+                                <span class="lib-num">#{li.displayIndex}</span>
+                                <button class="lib-remove" data-index={idx} onclick={removeLineItem}>&#10005;</button>
+                            </div>
+                            <div class="form-row-2">
+                                <div class="form-group">
+                                    <label class="form-label">Brand *</label>
+                                    <select class="form-input" data-index={idx} data-field="brand" onchange={onLineItem}>
+                                        <option value="">-- Brand --</option>
+                                        <template for:each={brandOptions} for:item="b">
+                                            <option key={b} value={b}>{b}</option>
+                                        </template>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Type *</label>
+                                    <select class="form-input" data-index={idx} data-field="packetType" onchange={onLineItem}>
+                                        <option value="">-- Type --</option>
+                                        <template for:each={packetTypeOptions} for:item="pt">
+                                            <option key={pt} value={pt}>{pt}</option>
+                                        </template>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-row-2">
+                                <div class="form-group">
+                                    <label class="form-label">Qty (KG) *</label>
+                                    <input type="number" class="form-input" placeholder="0.00"
+                                        min="0" step="0.5" data-index={idx} data-field="quantity" onchange={onLineItem}>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Rate (&#8377;/kg) *</label>
+                                    <input type="number" class="form-input" placeholder="0.00"
+                                        min="0" data-index={idx} data-field="rate" onchange={onLineItem}>
+                                </div>
+                            </div>
+                            <div class="lib-footer">
+                                <label class="gst-label">
+                                    <input type="checkbox" data-index={idx} data-field="gst" onchange={onLineItem}>
+                                    5% GST
+                                </label>
+                                <div class="lib-total">&#8377;{li.lineTotal}</div>
+                            </div>
+                            <template if:true={li.stockWarning}>
+                                <div class="lib-warn">&#9888; {li.stockWarning}</div>
+                            </template>
+                            <template if:true={li.stockHint}>
+                                <div class="lib-hint">&#10003; {li.stockHint} KG available</div>
+                            </template>
+                        </div>
+                    </template>
+                    <template if:false={hasLineItems}>
+                        <div class="li-empty">Tap + Add to add products</div>
+                    </template>
+                </div>
+
+                <template if:true={hasLineItems}>
+                    <div class="grand-total-bar">
+                        <span class="gt-label">Grand Total</span>
+                        <span class="gt-amount">&#8377;{grandTotal}</span>
+                    </div>
+                </template>
+
+                <template if:true={saleError}>
+                    <div class="form-error">&#9888; {saleError}</div>
+                </template>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-cancel" onclick={closeSaleModal}>Cancel</button>
+                <button class="modal-save" onclick={handleSave} disabled={isSaving}>{saveLabel}</button>
+            </div>
+        </div>
+    </template>
+
+    <!-- MAIN PAGE -->
+    <div class="page">
+
+        <!-- HEADER -->
+        <div class="client-header">
+            <div class="header-top">
+                <div class="header-badge">{accountType}</div>
+            </div>
+            <div class="client-name">{accountName}</div>
+            <div class="client-meta">
+                <template if:true={contactPerson}>
+                    <span class="meta-chip">&#128100; {contactPerson}</span>
+                </template>
+                <template if:true={area}>
+                    <span class="meta-chip">&#128205; {area}</span>
+                </template>
+                <template if:true={regionalManager}>
+                    <span class="meta-chip">&#129333; {regionalManager}</span>
+                </template>
+            </div>
+        </div>
+
+        <!-- BALANCE STRIP -->
+        <template if:true={hasBalance}>
+            <div class="balance-strip">
+                <div class="balance-left">
+                    <div class="balance-label">Outstanding Balance</div>
+                    <div class="balance-amount">&#8377;{accountBalance}</div>
+                </div>
+                <div class="balance-right">
+                    <div class="balance-label">Total Sales</div>
+                    <div class="balance-count">{totalSalesCount}</div>
+                </div>
+            </div>
+        </template>
+
+        <!-- INFO ROW -->
+        <div class="info-row">
+            <template if:true={phone}>
+                <a class="info-chip phone-chip" href={phoneLink}>&#128222; {phone}</a>
+            </template>
+            <template if:true={gstin}>
+                <div class="info-chip">&#129534; {gstin}</div>
+            </template>
+            <template if:true={mapLocation}>
+                <a class="info-chip map-chip" href={mapLocation} target="_blank">&#128506; Maps</a>
+            </template>
+        </div>
+
+        <!-- NEW SALE BUTTON -->
+        <div class="new-sale-wrap">
+            <button class="new-sale-btn" onclick={openSaleModal}>
+                <span class="btn-icon">+</span>
+                <span class="btn-text">New Sale</span>
+                <span class="btn-arrow">&#8594;</span>
+            </button>
+        </div>
+
+        <!-- SECTION HEAD -->
+        <div class="section-head">
+            <div class="section-title">Sales</div>
+            <div class="section-count">{totalSalesCount}</div>
+        </div>
+
+        <!-- LOADING -->
+        <template if:true={isLoading}>
+            <div class="loading-wrap">
+                <div class="spinner"></div>
+                <div class="loading-text">Loading sales...</div>
+            </div>
+        </template>
+
+        <!-- EMPTY -->
+        <template if:true={isEmpty}>
+            <div class="empty-wrap">
+                <div class="empty-icon">&#128666;</div>
+                <div class="empty-title">No sales yet</div>
+                <div class="empty-sub">Tap New Sale to record the first order</div>
+            </div>
+        </template>
+
+        <!-- SALES -->
+        <template if:false={isLoading}>
+            <template for:each={sales} for:item="sale">
+                <div key={sale.Id} class="sale-card">
+
+                    <!-- Header row -->
+                    <div class="sale-header" data-id={sale.Id} onclick={toggleSale}>
+                        <div class="sale-left">
+                            <div class="sale-num">{sale.Name}</div>
+                            <div class="sale-date">{sale.formattedDate}</div>
+                        </div>
+                        <div class="sale-right">
+                            <div class="sale-amount">&#8377;{sale.formattedRevenue}</div>
+                            <div class={sale.statusClass}>{sale.Payment_Status__c}</div>
+                        </div>
+                        <div class={sale.chevronClass}>&#8250;</div>
+                    </div>
+
+                    <!-- Expanded detail -->
+                    <template if:true={sale.isExpanded}>
+                        <div class="sale-detail">
+
+                            <!-- Current order status badge -->
+                            <div class="detail-status-row">
+                                <span class={sale.orderStatusClass}>{sale.Order_Status__c}</span>
+                                <template if:true={sale.Regional_Manager__c}>
+                                    <span class="manager-tag">&#129333; {sale.Regional_Manager__c}</span>
+                                </template>
+                            </div>
+
+                            <!-- Line Items -->
+                            <template if:true={sale.hasLineItems}>
+                                <div class="li-section">
+                                    <div class="li-section-title">Products</div>
+                                    <template for:each={sale.lineItems} for:item="li">
+                                        <div key={li.Id} class="li-row">
+                                            <div class="li-left">
+                                                <div class="li-brand">{li.Brand__c}</div>
+                                                <div class="li-meta">{li.Packet_Type__c} &middot; {li.Quantity__c} KG &middot; &#8377;{li.Rate_Per_Kg__c}/kg</div>
+                                            </div>
+                                            <div class="li-amount">&#8377;{li.formattedTotal}</div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+
+                            <!-- Financial Summary -->
+                            <div class="fin-summary">
+                                <div class="fin-row">
+                                    <span class="fin-label">Total Revenue</span>
+                                    <span class="fin-val">&#8377;{sale.formattedRevenue}</span>
+                                </div>
+                                <div class="fin-row">
+                                    <span class="fin-label">Collected</span>
+                                    <span class="fin-val green">&#8377;{sale.formattedCollected}</span>
+                                </div>
+                                <div class="fin-row fin-total">
+                                    <span class="fin-label">Balance Due</span>
+                                    <span class={sale.balanceClass}>&#8377;{sale.formattedBalance}</span>
+                                </div>
+                            </div>
+
+                            <!-- Payments -->
+                            <template if:true={sale.hasPayments}>
+                                <div class="pay-section">
+                                    <div class="li-section-title">Payments Received</div>
+                                    <template for:each={sale.payments} for:item="pay">
+                                        <div key={pay.Id} class="pay-row">
+                                            <div class="pay-left">
+                                                <div class="pay-date">{pay.formattedDate}</div>
+                                                <div class="pay-meta">{pay.Mode_of_Payment__c} &middot; {pay.Accepted_By__c}</div>
+                                            </div>
+                                            <div class="pay-amount">&#8377;{pay.formattedAmount}</div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+
+                            <!-- STATUS CHANGER -->
+                            <div class="status-changer">
+                                <div class="sc-label">Update Status</div>
+                                <div class="sc-options">
+                                    <button class="sc-btn sc-confirmed"
+                                        data-id={sale.Id} data-status="Confirmed"
+                                        onclick={updateStatus}>
+                                        Confirmed
+                                    </button>
+                                    <button class="sc-btn sc-transit"
+                                        data-id={sale.Id} data-status="Out for Delivery"
+                                        onclick={updateStatus}>
+                                        Out for Delivery
+                                    </button>
+                                    <button class="sc-btn sc-delivered"
+                                        data-id={sale.Id} data-status="Delivered"
+                                        onclick={updateStatus}>
+                                        &#10003; Delivered
+                                    </button>
+                                    <button class="sc-btn sc-cancelled"
+                                        data-id={sale.Id} data-status="Cancelled"
+                                        onclick={updateStatus}>
+                                        Cancelled
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- ACTIONS -->
+                            <div class="sale-actions">
+                                <button class="action-btn pay-btn"
+                                    data-id={sale.Id}
+                                    onclick={logPayment}>
+                                    &#128176; Log Payment
+                                </button>
+                                <button class="action-btn view-btn"
+                                    data-id={sale.Id}
+                                    onclick={viewSale}>
+                                    View Full &#8594;
+                                </button>
+                            </div>
+
+                        </div>
+                    </template>
+                </div>
+            </template>
+        </template>
+
+        <div class="bottom-space"></div>
+    </div>
+
+</template>

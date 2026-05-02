@@ -1,0 +1,359 @@
+<template>
+<div class="page">
+
+    <!-- SHRINKAGE MODAL -->
+    <template if:true={isShrinkOpen}>
+        <div class="modal-backdrop" onclick={closeShrink}></div>
+        <div class="modal-sheet">
+            <div class="modal-handle"></div>
+            <div class="modal-header">
+                <div class="modal-title-wrap">
+                    <div class="modal-title">Update Shrinkage</div>
+                    <div class="modal-sub">{shrinkBrand} · {shrinkType}</div>
+                </div>
+                <button class="modal-close" onclick={closeShrink}>&#10005;</button>
+            </div>
+            <div class="modal-body">
+                <div class="shrink-info">
+                    Shrinkage = weight lost due to moisture, damaged
+                    packets, or samples given. Enter total KG lost
+                    from this batch.
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Shrinkage (KG)</label>
+                    <input type="number" class="form-input"
+                        value={shrinkValue} min="0" step="0.1"
+                        placeholder="0.00"
+                        onchange={onShrinkVal}>
+                </div>
+                <template if:true={shrinkError}>
+                    <div class="form-error">&#9888; {shrinkError}</div>
+                </template>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" onclick={closeShrink}>
+                    Cancel
+                </button>
+                <button class="btn-save" onclick={saveShrinkage}
+                    disabled={isShrinkSaving}>
+                    {shrinkSaveLabel}
+                </button>
+            </div>
+        </div>
+    </template>
+
+    <!-- BRAND DETAIL MODAL -->
+    <template if:true={isDetailOpen}>
+        <div class="modal-backdrop" onclick={closeDetail}></div>
+        <div class="modal-sheet detail-sheet">
+            <div class="modal-handle"></div>
+            <div class="modal-header detail-header">
+                <div class="modal-title-wrap">
+                    <div class="modal-title">{detailBrand}</div>
+                    <div class="modal-sub">{detailType}</div>
+                </div>
+                <button class="modal-close detail-close"
+                    onclick={closeDetail}>&#10005;</button>
+            </div>
+
+            <div class="detail-tabs">
+                <button class={purchaseTabClass}
+                    onclick={showPurchaseTab}>
+                    Purchases
+                </button>
+                <button class={salesTabClass}
+                    onclick={showSalesTab}>
+                    Sales
+                </button>
+            </div>
+
+            <div class="modal-body">
+
+                <!-- Loading -->
+                <template if:true={isDetailLoading}>
+                    <div class="loading-wrap">
+                        <div class="spinner"></div>
+                    </div>
+                </template>
+
+                <!-- Purchases tab -->
+                <template if:true={showingPurchases}>
+                    <template if:true={noPurchases}>
+                        <div class="empty-wrap">
+                            <div class="empty-title">No purchases yet</div>
+                        </div>
+                    </template>
+                    <template for:each={detailPurchases}
+                        for:item="p">
+                        <div key={p.Id} class="detail-card">
+                            <div class="dc-top">
+                                <div class="dc-num">
+                                    {p.Purchase__r.Name}
+                                </div>
+                                <div class={p.deliveryClass}>
+                                    {p.Purchase__r.Delivery_Status__c}
+                                </div>
+                            </div>
+                            <div class="dc-meta">
+                                {p.Purchase__r.Supplier__r.Name}
+                                &middot; {p.formattedDate}
+                            </div>
+                            <div class="dc-row">
+                                <span class="dc-label">Qty</span>
+                                <span class="dc-val">
+                                    {p.Quantity__c} KG
+                                </span>
+                            </div>
+                            <div class="dc-row">
+                                <span class="dc-label">Cost/KG</span>
+                                <span class="dc-val">
+                                    &#8377;{p.Landing_Cost_Per_Kg__c}
+                                </span>
+                            </div>
+                            <div class="dc-row">
+                                <span class="dc-label">Total</span>
+                                <span class="dc-val bold">
+                                    &#8377;{p.formattedTotal}
+                                </span>
+                            </div>
+                            <template if:true={p.Shrinkage__c}>
+                                <div class="dc-row">
+                                    <span class="dc-label">Shrinkage</span>
+                                    <span class="dc-val amber">
+                                        {p.Shrinkage__c} KG
+                                    </span>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                </template>
+
+                <!-- Sales tab -->
+                <template if:true={showingSales}>
+                    <template if:true={noSales}>
+                        <div class="empty-wrap">
+                            <div class="empty-title">No sales yet</div>
+                        </div>
+                    </template>
+                    <template for:each={detailSales} for:item="s">
+                        <div key={s.Id} class="detail-card">
+                            <div class="dc-top">
+                                <div class="dc-num">
+                                    {s.Sale__r.Name}
+                                </div>
+                                <div class="dc-profit">
+                                    +&#8377;{s.formattedProfit}
+                                </div>
+                            </div>
+                            <div class="dc-meta">
+                                {s.Sale__r.Client__r.Name}
+                                &middot; {s.formattedDate}
+                            </div>
+                            <div class="dc-row">
+                                <span class="dc-label">Qty Sold</span>
+                                <span class="dc-val">
+                                    {s.Quantity__c} KG
+                                </span>
+                            </div>
+                            <div class="dc-row">
+                                <span class="dc-label">Rate/KG</span>
+                                <span class="dc-val">
+                                    &#8377;{s.Rate_Per_Kg__c}
+                                </span>
+                            </div>
+                            <div class="dc-row">
+                                <span class="dc-label">Revenue</span>
+                                <span class="dc-val bold">
+                                    &#8377;{s.formattedRevenue}
+                                </span>
+                            </div>
+                        </div>
+                    </template>
+                </template>
+
+            </div>
+        </div>
+    </template>
+
+    <!-- MAIN PAGE -->
+
+    <!-- HEADER -->
+    <div class="inv-header">
+        <div class="inv-title">Inventories</div>
+        <div class="inv-subtitle">Live stock levels</div>
+    </div>
+
+    <!-- LOADING -->
+    <template if:true={isLoading}>
+        <div class="loading-wrap" style="padding:60px 20px;">
+            <div class="spinner"></div>
+            <div class="loading-text">Loading stock...</div>
+        </div>
+    </template>
+
+    <template if:false={isLoading}>
+
+        <!-- SUMMARY STRIP -->
+        <div class="summary-strip">
+            <div class="ss-item">
+                <div class="ss-label">Total Brands</div>
+                <div class="ss-val">{totalBrands}</div>
+            </div>
+            <div class="ss-divider"></div>
+            <div class="ss-item">
+                <div class="ss-label">Total KG</div>
+                <div class="ss-val">{totalKg}</div>
+            </div>
+            <div class="ss-divider"></div>
+            <div class="ss-item">
+                <div class="ss-label">Stock Value</div>
+                <div class="ss-val green">&#8377;{totalValue}</div>
+            </div>
+            <div class="ss-divider"></div>
+            <div class="ss-item">
+                <div class="ss-label">Low Stock</div>
+                <div class="ss-val red">{lowStockCount}</div>
+            </div>
+        </div>
+
+        <!-- LOW STOCK ALERT -->
+        <template if:true={hasLowStock}>
+            <div class="low-stock-alert">
+                <span class="lsa-icon">&#9888;</span>
+                <span class="lsa-text">
+                    {lowStockCount} brand(s) running low
+                    (under 10 KG). Reorder soon.
+                </span>
+            </div>
+        </template>
+
+        <!-- INVENTORY CARDS -->
+        <div class="inv-list">
+            <template for:each={inventory} for:item="inv">
+                <div key={inv.Id} class={inv.cardClass}>
+
+                    <!-- Card Header -->
+                    <div class="inv-card-top">
+                        <div class="inv-card-left">
+                            <div class="inv-brand">{inv.Brand__c}</div>
+                            <div class="inv-type">
+                                {inv.Packet_Type__c}
+                            </div>
+                        </div>
+                        <div class={inv.stockBadgeClass}>
+                            {inv.stockLabel}
+                        </div>
+                    </div>
+
+                    <!-- Stock Bar -->
+                    <div class="stock-bar-wrap">
+                        <div class="stock-bar-bg">
+                            <div class={inv.barClass}
+                                style={inv.barStyle}>
+                            </div>
+                        </div>
+                        <div class="stock-bar-labels">
+                            <span class="sbl-remaining">
+                                {inv.Remaining_Quantity__c} KG remaining
+                            </span>
+                            <span class="sbl-total">
+                                of {inv.Total_Quantity__c} KG
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Metrics Row -->
+                    <div class="inv-metrics">
+                        <div class="im-item">
+                            <div class="im-label">Packets</div>
+                            <div class="im-val">
+                                {inv.Packet_Count__c}
+                            </div>
+                        </div>
+                        <div class="im-item">
+                            <div class="im-label">Sold</div>
+                            <div class="im-val">
+                                {inv.Quantity_Sold__c} KG
+                            </div>
+                        </div>
+                        <div class="im-item">
+                            <div class="im-label">Avg Cost</div>
+                            <div class="im-val">
+                                &#8377;{inv.formattedCost}/kg
+                            </div>
+                        </div>
+                        <div class="im-item">
+                            <div class="im-label">Value</div>
+                            <div class="im-val green">
+                                &#8377;{inv.formattedValue}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Footer -->
+                    <div class="inv-card-footer">
+                        <div class="inv-footer-left">
+                            <template if:true={inv.Shrinkage__c}>
+                                <span class="shrink-tag">
+                                    &#9651; {inv.Shrinkage__c} KG shrinkage
+                                </span>
+                            </template>
+                            <template if:true={inv.Last_Purchase_Date__c}>
+                                <span class="last-purchase">
+                                    Last purchased: {inv.formattedLastDate}
+                                </span>
+                            </template>
+                        </div>
+                        <div class="inv-footer-actions">
+                            <button class="action-chip history-chip"
+                                data-id={inv.Id}
+                                data-brand={inv.Brand__c}
+                                data-type={inv.Packet_Type__c}
+                                onclick={openDetail}>
+                                History
+                            </button>
+                            <button class="action-chip shrink-chip"
+                                data-id={inv.Id}
+                                data-brand={inv.Brand__c}
+                                data-type={inv.Packet_Type__c}
+                                data-shrink={inv.Shrinkage__c}
+                                onclick={openShrink}>
+                                Shrinkage
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            </template>
+        </div>
+
+        <!-- OUT OF STOCK SECTION -->
+        <template if:true={hasOutOfStock}>
+            <div class="section-head">
+                <div class="section-title">Out of Stock</div>
+                <div class="section-count">{outOfStockCount}</div>
+            </div>
+            <template for:each={outOfStock} for:item="inv">
+                <div key={inv.Id} class="inv-card card-empty">
+                    <div class="inv-card-top">
+                        <div class="inv-card-left">
+                            <div class="inv-brand">{inv.Brand__c}</div>
+                            <div class="inv-type">{inv.Packet_Type__c}</div>
+                        </div>
+                        <div class="stock-badge badge-empty">
+                            Out of Stock
+                        </div>
+                    </div>
+                    <div class="oos-meta">
+                        Sold: {inv.Quantity_Sold__c} KG total &middot;
+                        Last purchased: {inv.formattedLastDate}
+                    </div>
+                </div>
+            </template>
+        </template>
+
+    </template>
+
+    <div class="bottom-space"></div>
+</div>
+</template>

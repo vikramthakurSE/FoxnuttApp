@@ -1,0 +1,505 @@
+<template>
+
+    <!-- TRIGGER BUTTON — shown when modal is closed -->
+    <template if:false={isOpen}>
+        <button class="trigger-btn" onclick={openModal}>
+            <span class="trigger-icon">+</span>
+            <span class="trigger-text">New Purchase Order</span>
+            <span class="trigger-arrow">&#8594;</span>
+        </button>
+    </template>
+
+    <!-- MODAL -->
+    <template if:true={isOpen}>
+        <div class="modal-backdrop" onclick={handleBackdrop}></div>
+        <div class="modal-sheet">
+            <div class="modal-handle"></div>
+
+            <!-- ══ STEP 1: PURCHASE FORM ══ -->
+            <template if:true={isStep1}>
+
+                <div class="modal-header">
+                    <div class="modal-title-wrap">
+                        <div class="modal-title">New Purchase Order</div>
+                        <template if:true={supplierName}>
+                            <div class="modal-sub">{supplierName}</div>
+                        </template>
+                    </div>
+                    <button class="modal-close" onclick={closeModal}>
+                        &#10005;
+                    </button>
+                </div>
+
+                <div class="modal-body">
+
+                    <!-- ORDER DETAILS -->
+                    <div class="section-card">
+                        <div class="section-title">
+                            &#128203; Order Details
+                        </div>
+
+                        <template if:false={supplierId}>
+                            <div class="form-group">
+                                <label class="form-label">
+                                    Supplier *
+                                </label>
+                                <select class="form-input"
+                                    onchange={onSupplier}>
+                                    <option value="">
+                                        -- Select Supplier --
+                                    </option>
+                                    <template for:each={suppliers}
+                                        for:item="s">
+                                        <option key={s.Id} value={s.Id}>
+                                            {s.Name}
+                                        </option>
+                                    </template>
+                                </select>
+                            </div>
+                        </template>
+
+                        <div class="form-row-2">
+                            <div class="form-group">
+                                <label class="form-label">
+                                    Order Date *
+                                </label>
+                                <input type="date" class="form-input"
+                                    value={orderDate}
+                                    onchange={onOrderDate}>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Status</label>
+                                <select class="form-input"
+                                    onchange={onDeliveryStatus}>
+                                    <template for:each={deliveryStatuses}
+                                        for:item="ds">
+                                        <option key={ds} value={ds}>
+                                            {ds}
+                                        </option>
+                                    </template>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Notes</label>
+                            <textarea class="form-input form-textarea"
+                                placeholder="Any remarks..."
+                                onchange={onNotes}></textarea>
+                        </div>
+                    </div>
+
+                    <!-- LINE ITEMS -->
+                    <div class="section-card">
+                        <div class="section-title-row">
+                            <div class="section-title">
+                                &#128230; Products
+                            </div>
+                            <button class="add-btn"
+                                onclick={addLineItem}>
+                                + Add
+                            </button>
+                        </div>
+
+                        <template for:each={lineItems} for:item="li"
+                            for:index="idx">
+                            <div key={li.key} class="li-card">
+                                <div class="li-top">
+                                    <span class="li-num">
+                                        #{li.displayIndex}
+                                    </span>
+                                    <button class="li-remove"
+                                        data-index={idx}
+                                        onclick={removeLineItem}>
+                                        &#10005;
+                                    </button>
+                                </div>
+                                <div class="form-row-2">
+                                    <div class="form-group">
+                                        <label class="form-label">
+                                            Brand *
+                                        </label>
+                                        <select class="form-input"
+                                            data-index={idx}
+                                            data-field="brand"
+                                            onchange={onLineItem}>
+                                            <option value="">
+                                                -- Brand --
+                                            </option>
+                                            <template
+                                                for:each={brandOptions}
+                                                for:item="b">
+                                                <option key={b}
+                                                    value={b}>{b}
+                                                </option>
+                                            </template>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">
+                                            Type *
+                                        </label>
+                                        <select class="form-input"
+                                            data-index={idx}
+                                            data-field="packetType"
+                                            onchange={onLineItem}>
+                                            <option value="">
+                                                -- Type --
+                                            </option>
+                                            <template
+                                                for:each={packetTypeOptions}
+                                                for:item="pt">
+                                                <option key={pt}
+                                                    value={pt}>{pt}
+                                                </option>
+                                            </template>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-row-2">
+                                    <div class="form-group">
+                                        <label class="form-label">
+                                            Quantity (KG) *
+                                        </label>
+                                        <input type="number"
+                                            class="form-input"
+                                            placeholder="0.00"
+                                            min="0" step="0.5"
+                                            data-index={idx}
+                                            data-field="quantity"
+                                            onchange={onLineItem}>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">
+                                            Cost/KG (&#8377;) *
+                                        </label>
+                                        <input type="number"
+                                            class="form-input"
+                                            placeholder="0.00"
+                                            min="0"
+                                            data-index={idx}
+                                            data-field="cost"
+                                            onchange={onLineItem}>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">
+                                        Shrinkage (KG)
+                                    </label>
+                                    <input type="number"
+                                        class="form-input"
+                                        placeholder="0 (optional)"
+                                        min="0" step="0.1"
+                                        data-index={idx}
+                                        data-field="shrinkage"
+                                        onchange={onLineItem}>
+                                </div>
+                                <div class="li-summary">
+                                    <div class="li-sum-row">
+                                        <span class="li-sum-label">
+                                            Packets
+                                        </span>
+                                        <span class="li-sum-val">
+                                            {li.packetCount}
+                                        </span>
+                                    </div>
+                                    <div class="li-sum-row">
+                                        <span class="li-sum-label">
+                                            Line Total
+                                        </span>
+                                        <span class="li-sum-val bold">
+                                            &#8377;{li.lineTotal}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+
+                        <template if:false={hasLineItems}>
+                            <div class="li-empty">
+                                Tap + Add to add products
+                            </div>
+                        </template>
+                    </div>
+
+                    <!-- ORDER TOTAL -->
+                    <template if:true={hasLineItems}>
+                        <div class="total-bar">
+                            <div class="total-row">
+                                <span class="total-label">
+                                    Total KG
+                                </span>
+                                <span class="total-val">
+                                    {totalKg} KG
+                                </span>
+                            </div>
+                            <div class="total-row total-main">
+                                <span class="total-label">
+                                    Total Order Cost
+                                </span>
+                                <span class="total-amount">
+                                    &#8377;{totalCost}
+                                </span>
+                            </div>
+                        </div>
+                    </template>
+
+                    <!-- ADVANCE PAYMENT -->
+                    <div class="section-card">
+                        <div class="section-title-row">
+                            <div class="section-title">
+                                &#128176; Advance Payment
+                            </div>
+                            <label class="toggle-wrap">
+                                <input type="checkbox"
+                                    class="toggle-input"
+                                    checked={hasAdvance}
+                                    onchange={onToggleAdvance}>
+                                <span class="toggle-label">
+                                    {advanceToggleLabel}
+                                </span>
+                            </label>
+                        </div>
+
+                        <template if:true={hasAdvance}>
+                            <div class="advance-body">
+                                <div class="form-row-2">
+                                    <div class="form-group">
+                                        <label class="form-label">
+                                            Amount (&#8377;) *
+                                        </label>
+                                        <input type="number"
+                                            class="form-input"
+                                            placeholder="0.00" min="0"
+                                            value={advanceAmount}
+                                            onchange={onAdvanceAmount}>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">
+                                            Date *
+                                        </label>
+                                        <input type="date"
+                                            class="form-input"
+                                            value={advanceDate}
+                                            onchange={onAdvanceDate}>
+                                    </div>
+                                </div>
+                                <div class="form-row-2">
+                                    <div class="form-group">
+                                        <label class="form-label">
+                                            Mode *
+                                        </label>
+                                        <select class="form-input"
+                                            onchange={onAdvanceMode}>
+                                            <template
+                                                for:each={paymentModes}
+                                                for:item="m">
+                                                <option key={m}
+                                                    value={m}>{m}
+                                                </option>
+                                            </template>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">
+                                            Paid By *
+                                        </label>
+                                        <select class="form-input"
+                                            onchange={onAdvancePaidBy}>
+                                            <option value="">
+                                                -- Select --
+                                            </option>
+                                            <template
+                                                for:each={teamMembers}
+                                                for:item="m">
+                                                <option key={m}
+                                                    value={m}>{m}
+                                                </option>
+                                            </template>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">
+                                        Reference / UTR
+                                    </label>
+                                    <input type="text"
+                                        class="form-input"
+                                        placeholder="Optional"
+                                        onchange={onAdvanceNotes}>
+                                </div>
+                                <template if:true={hasLineItems}>
+                                    <div class="advance-summary">
+                                        <div class="adv-row">
+                                            <span class="adv-label">
+                                                Order Total
+                                            </span>
+                                            <span class="adv-val">
+                                                &#8377;{totalCost}
+                                            </span>
+                                        </div>
+                                        <div class="adv-row">
+                                            <span class="adv-label">
+                                                Advance Paying
+                                            </span>
+                                            <span class="adv-val green">
+                                                &#8377;{advanceAmount}
+                                            </span>
+                                        </div>
+                                        <div class="adv-row adv-main">
+                                            <span class="adv-label">
+                                                Remaining Due
+                                            </span>
+                                            <span class="adv-val red">
+                                                &#8377;{remainingDue}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+
+                        <template if:false={hasAdvance}>
+                            <div class="no-advance-note">
+                                Full amount will be marked as pending.
+                            </div>
+                        </template>
+                    </div>
+
+                    <template if:true={errorMessage}>
+                        <div class="error-box">
+                            &#9888; {errorMessage}
+                        </div>
+                    </template>
+
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn-cancel" onclick={closeModal}>
+                        Cancel
+                    </button>
+                    <button class="btn-save"
+                        onclick={handleSave}
+                        disabled={isSaving}>
+                        {saveLabel}
+                    </button>
+                </div>
+
+            </template>
+
+            <!-- ══ STEP 2: TAX PROMPT ══ -->
+            <template if:true={isStep2}>
+
+                <div class="modal-header tax-header">
+                    <div class="modal-title-wrap">
+                        <div class="modal-title">
+                            Any Tax on this Order?
+                        </div>
+                        <div class="modal-sub">
+                            Purchase saved &#10003; — record tax if applicable
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-body">
+
+                    <div class="tax-order-summary">
+                        <div class="tos-label">Order Cost</div>
+                        <div class="tos-amount">&#8377;{totalCost}</div>
+                        <div class="tos-note">
+                            Purchase order has been saved.
+                            Did you pay any GST or other tax on this?
+                        </div>
+                    </div>
+
+                    <div class="section-card">
+                        <div class="section-title-row">
+                            <div class="section-title">
+                                &#129534; Tax Paid
+                            </div>
+                            <label class="toggle-wrap">
+                                <input type="checkbox"
+                                    class="toggle-input"
+                                    checked={hasTax}
+                                    onchange={onToggleTax}>
+                                <span class="toggle-label">
+                                    {taxToggleLabel}
+                                </span>
+                            </label>
+                        </div>
+
+                        <template if:true={hasTax}>
+                            <div class="form-group">
+                                <label class="form-label">
+                                    Tax Amount (&#8377;) *
+                                </label>
+                                <input type="number"
+                                    class="form-input tax-input"
+                                    placeholder="0.00"
+                                    min="0"
+                                    value={taxAmount}
+                                    onchange={onTaxAmount}>
+                            </div>
+                            <template if:true={taxAmount}>
+                                <div class="tax-total-preview">
+                                    <div class="ttp-row">
+                                        <span>Order Cost</span>
+                                        <span>&#8377;{totalCost}</span>
+                                    </div>
+                                    <div class="ttp-row">
+                                        <span>Tax</span>
+                                        <span class="red">
+                                            + &#8377;{taxAmount}
+                                        </span>
+                                    </div>
+                                    <div class="ttp-row ttp-total">
+                                        <span>Total incl. Tax</span>
+                                        <span class="amber">
+                                            &#8377;{totalWithTax}
+                                        </span>
+                                    </div>
+                                </div>
+                            </template>
+                        </template>
+
+                        <template if:false={hasTax}>
+                            <div class="no-advance-note">
+                                No tax will be recorded for this order.
+                            </div>
+                        </template>
+                    </div>
+
+                    <template if:true={taxError}>
+                        <div class="error-box">
+                            &#9888; {taxError}
+                        </div>
+                    </template>
+
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn-cancel skip-btn"
+                        onclick={skipTax}>
+                        Skip
+                    </button>
+                    <template if:true={hasTax}>
+                        <button class="btn-save"
+                            onclick={saveTax}
+                            disabled={isTaxSaving}>
+                            {taxSaveLabel}
+                        </button>
+                    </template>
+                    <template if:false={hasTax}>
+                        <button class="btn-save done-btn"
+                            onclick={skipTax}>
+                            Done — No Tax
+                        </button>
+                    </template>
+                </div>
+
+            </template>
+
+        </div>
+    </template>
+
+</template>

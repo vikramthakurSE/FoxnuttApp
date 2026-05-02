@@ -1,0 +1,309 @@
+<template>
+
+    <!-- MODALS AT TOP -->
+
+    <!-- PAY MANUFACTURER MODAL -->
+    <template if:true={isPaymentOpen}>
+        <div class="modal-backdrop" onclick={closePaymentModal}></div>
+        <div class="modal-sheet">
+            <div class="modal-handle"></div>
+            <div class="modal-header">
+                <div class="modal-title-wrap">
+                    <div class="modal-title">Pay Manufacturer</div>
+                    <div class="modal-client">
+                        {paymentPurchaseName} &middot; Due: &#8377;{paymentBalance}
+                    </div>
+                </div>
+                <button class="modal-close" onclick={closePaymentModal}>&#10005;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label class="form-label">Amount (Rs) *</label>
+                        <input type="number" class="form-input"
+                            value={paymentAmount} min="0"
+                            placeholder="0.00" onchange={onPayAmt}>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Date *</label>
+                        <input type="date" class="form-input"
+                            value={paymentDate} onchange={onPayDate}>
+                    </div>
+                </div>
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label class="form-label">Mode *</label>
+                        <select class="form-input" onchange={onPayMode}>
+                            <template for:each={paymentModes} for:item="m">
+                                <option key={m} value={m}>{m}</option>
+                            </template>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Paid By *</label>
+                        <select class="form-input" onchange={onPayBy}>
+                            <option value="">-- Select --</option>
+                            <template for:each={teamMembers} for:item="m">
+                                <option key={m} value={m}>{m}</option>
+                            </template>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Reference / UTR</label>
+                    <input type="text" class="form-input"
+                        placeholder="Optional" onchange={onPayRef}>
+                </div>
+                <template if:true={paymentError}>
+                    <div class="form-error">&#9888; {paymentError}</div>
+                </template>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-cancel" onclick={closePaymentModal}>Cancel</button>
+                <button class="modal-save" onclick={handlePaySave}
+                    disabled={isPaySaving}>{paySaveLabel}</button>
+            </div>
+        </div>
+    </template>
+
+    <!-- MAIN PAGE -->
+    <div class="page">
+
+        <!-- HEADER -->
+        <div class="supplier-header">
+            <div class="header-top">
+                <div class="header-badge">Supplier</div>
+                <div class="header-brands">{brandList}</div>
+            </div>
+            <div class="supplier-name">{supplierName}</div>
+            <div class="supplier-meta">
+                <template if:true={phone}>
+                    <span class="meta-chip">&#128222; {phone}</span>
+                </template>
+            </div>
+        </div>
+
+        <!-- OUTSTANDING STRIP -->
+        <template if:true={hasOutstanding}>
+            <div class="outstanding-strip">
+                <div class="os-left">
+                    <div class="os-label">Total Outstanding to Supplier</div>
+                    <div class="os-amount">&#8377;{totalOutstanding}</div>
+                </div>
+                <div class="os-right">
+                    <div class="os-label">Total Purchases</div>
+                    <div class="os-count">{totalPurchasesCount}</div>
+                </div>
+            </div>
+        </template>
+
+        <!-- SUMMARY PILLS -->
+        <div class="summary-pills">
+            <div class="spill">
+                <div class="spill-label">Total Ordered</div>
+                <div class="spill-val">&#8377;{totalOrdered}</div>
+            </div>
+            <div class="spill">
+                <div class="spill-label">Total Paid</div>
+                <div class="spill-val green">&#8377;{totalPaid}</div>
+            </div>
+            <div class="spill">
+                <div class="spill-label">Pending</div>
+                <div class="spill-val red">&#8377;{totalOutstanding}</div>
+            </div>
+        </div>
+
+        <!-- NEW PURCHASE BUTTON -->
+        <!-- Embedded quickPurchaseEntry — pre-fills supplier -->
+        <div class="new-purchase-wrap">
+            <c-quick-purchase-entry
+                record-id={recordId}
+                onpurchasecreated={handlePurchaseCreated}>
+            </c-quick-purchase-entry>
+        </div>
+
+        <!-- PURCHASES SECTION -->
+        <div class="section-head">
+            <div class="section-title">Purchase Orders</div>
+            <div class="section-count">{totalPurchasesCount}</div>
+        </div>
+
+        <!-- Loading -->
+        <template if:true={isLoading}>
+            <div class="loading-wrap">
+                <div class="spinner"></div>
+                <div class="loading-text">Loading purchases...</div>
+            </div>
+        </template>
+
+        <!-- Empty -->
+        <template if:true={isEmpty}>
+            <div class="empty-wrap">
+                <div class="empty-icon">&#128666;</div>
+                <div class="empty-title">No purchases yet</div>
+                <div class="empty-sub">Tap New Purchase Order to get started</div>
+            </div>
+        </template>
+
+        <!-- Purchase Cards -->
+        <template if:false={isLoading}>
+            <template for:each={purchases} for:item="pur">
+                <div key={pur.Id} class="purchase-card">
+
+                    <!-- Card Header -->
+                    <div class="pur-header"
+                        data-id={pur.Id}
+                        onclick={togglePurchase}>
+                        <div class="pur-left">
+                            <div class="pur-num">{pur.Name}</div>
+                            <div class="pur-date">{pur.formattedDate}</div>
+                        </div>
+                        <div class="pur-right">
+                            <div class="pur-amount">
+                                &#8377;{pur.formattedTotal}
+                            </div>
+                            <div class={pur.payStatusClass}>
+                                {pur.Manufacturer_Payment_Status__c}
+                            </div>
+                        </div>
+                        <div class={pur.chevronClass}>&#8250;</div>
+                    </div>
+
+                    <!-- Delivery badge row -->
+                    <div class="pur-delivery-row">
+                        <span class={pur.deliveryClass}>
+                            {pur.Delivery_Status__c}
+                        </span>
+                        <template if:true={pur.Quarter__c}>
+                            <span class="quarter-tag">{pur.Quarter__c}</span>
+                        </template>
+                    </div>
+
+                    <!-- Expanded Detail -->
+                    <template if:true={pur.isExpanded}>
+                        <div class="pur-detail">
+
+                            <!-- Line Items -->
+                            <template if:true={pur.hasLineItems}>
+                                <div class="li-section">
+                                    <div class="li-section-title">
+                                        Products Ordered
+                                    </div>
+                                    <template for:each={pur.lineItems}
+                                        for:item="li">
+                                        <div key={li.Id} class="li-row">
+                                            <div class="li-left">
+                                                <div class="li-brand">
+                                                    {li.Brand__c}
+                                                </div>
+                                                <div class="li-meta">
+                                                    {li.Packet_Type__c}
+                                                    &middot; {li.Quantity__c} KG
+                                                    &middot; &#8377;{li.Landing_Cost_Per_Kg__c}/kg
+                                                </div>
+                                                <template if:true={li.Shrinkage__c}>
+                                                    <div class="li-shrink">
+                                                        Shrinkage: {li.Shrinkage__c} KG
+                                                    </div>
+                                                </template>
+                                            </div>
+                                            <div class="li-amount">
+                                                &#8377;{li.formattedTotal}
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+
+                            <!-- Financial Summary -->
+                            <div class="fin-summary">
+                                <div class="fin-row">
+                                    <span class="fin-label">Order Total</span>
+                                    <span class="fin-val">
+                                        &#8377;{pur.formattedTotal}
+                                    </span>
+                                </div>
+                                <template if:true={pur.hasTax}>
+                                    <div class="fin-row">
+                                        <span class="fin-label">
+                                            Tax Paid
+                                        </span>
+                                        <span class="fin-val amber">
+                                            &#8377;{pur.formattedTax}
+                                        </span>
+                                    </div>
+                                </template>
+                                <div class="fin-row">
+                                    <span class="fin-label">Paid to Mfr</span>
+                                    <span class="fin-val green">
+                                        &#8377;{pur.formattedPaid}
+                                    </span>
+                                </div>
+                                <div class="fin-row fin-total">
+                                    <span class="fin-label">Still Owed</span>
+                                    <span class={pur.outstandingClass}>
+                                        &#8377;{pur.formattedOutstanding}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Manufacturer Payments -->
+                            <template if:true={pur.hasPayments}>
+                                <div class="pay-section">
+                                    <div class="li-section-title">
+                                        Payments Made
+                                    </div>
+                                    <template for:each={pur.mfrPayments}
+                                        for:item="mp">
+                                        <div key={mp.Id} class="pay-row">
+                                            <div class="pay-left">
+                                                <div class="pay-date">
+                                                    {mp.formattedDate}
+                                                </div>
+                                                <div class="pay-meta">
+                                                    {mp.Mode_of_Payment__c}
+                                                    &middot; {mp.Paid_By__c}
+                                                </div>
+                                                <template if:true={mp.Notes__c}>
+                                                    <div class="pay-ref">
+                                                        {mp.Notes__c}
+                                                    </div>
+                                                </template>
+                                            </div>
+                                            <div class="pay-amount">
+                                                &#8377;{mp.formattedAmount}
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+
+                            <!-- Action Buttons -->
+                            <div class="pur-actions">
+                                <template if:true={pur.hasOutstanding}>
+                                    <button class="action-btn pay-btn"
+                                        data-id={pur.Id}
+                                        data-name={pur.Name}
+                                        data-outstanding={pur.Amount_Outstanding__c}
+                                        onclick={openPaymentModal}>
+                                        &#128176; Pay Manufacturer
+                                    </button>
+                                </template>
+                                <button class="action-btn view-btn"
+                                    data-id={pur.Id}
+                                    onclick={viewPurchase}>
+                                    View Full &#8594;
+                                </button>
+                            </div>
+
+                        </div>
+                    </template>
+
+                </div>
+            </template>
+        </template>
+
+        <div class="bottom-space"></div>
+    </div>
+
+</template>

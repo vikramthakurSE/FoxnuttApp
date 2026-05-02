@@ -1,0 +1,186 @@
+<template>
+<div class="page">
+
+    <!-- TOP BAR -->
+    <div class="topbar">
+        <div class="topbar-title">Accounts</div>
+        <div class="topbar-counts">
+            <span class="tc client">{clientCount} clients</span>
+            <span class="tc supplier">{supplierCount} suppliers</span>
+        </div>
+    </div>
+
+    <!-- SEARCH -->
+    <div class="search-wrap">
+        <div class="search-box">
+            <span class="search-icon">&#128269;</span>
+            <input type="text"
+                class="search-input"
+                placeholder="Search by name, area or contact..."
+                value={searchTerm}
+                oninput={onSearch}>
+            <template if:true={searchTerm}>
+                <button class="search-clear" onclick={clearSearch}>
+                    &#10005;
+                </button>
+            </template>
+        </div>
+    </div>
+
+    <!-- TABS -->
+    <div class="tabs">
+        <button class={clientTabClass} onclick={showClients}
+            data-tab="clients">
+            &#127751; Clients
+            <span class="tab-badge">{clientCount}</span>
+        </button>
+        <button class={supplierTabClass} onclick={showSuppliers}
+            data-tab="suppliers">
+            &#127968; Suppliers
+            <span class="tab-badge">{supplierCount}</span>
+        </button>
+    </div>
+
+    <!-- LOADING -->
+    <template if:true={isLoading}>
+        <div class="loading-wrap">
+            <div class="spinner"></div>
+            <div class="loading-text">Loading accounts...</div>
+        </div>
+    </template>
+
+    <template if:false={isLoading}>
+
+        <!-- CLIENTS TAB -->
+        <template if:true={showingClients}>
+
+            <!-- Outstanding summary bar -->
+            <template if:true={hasOutstanding}>
+                <div class="summary-bar">
+                    <div class="sb-left">
+                        <div class="sb-label">Total Outstanding</div>
+                        <div class="sb-amount">&#8377;{totalOutstanding}</div>
+                    </div>
+                    <div class="sb-right">
+                        <div class="sb-label">Clients with balance</div>
+                        <div class="sb-count">{clientsWithBalance}</div>
+                    </div>
+                </div>
+            </template>
+
+            <!-- No results -->
+            <template if:true={noClients}>
+                <div class="empty-wrap">
+                    <div class="empty-icon">&#128101;</div>
+                    <div class="empty-title">No clients found</div>
+                    <div class="empty-sub">Try a different search term</div>
+                </div>
+            </template>
+
+            <!-- Client cards -->
+            <template for:each={clients} for:item="c">
+                <div key={c.id} class={c.cardClass}
+                    data-id={c.id} onclick={openAccount}>
+
+                    <div class="card-top">
+                        <div class="card-left">
+                            <div class="card-name">{c.name}</div>
+                            <div class="card-meta">
+                                <template if:true={c.area}>
+                                    <span class="card-chip area-chip">
+                                        &#128205; {c.area}
+                                    </span>
+                                </template>
+                                <template if:true={c.manager}>
+                                    <span class="card-chip mgr-chip">
+                                        &#129333; {c.manager}
+                                    </span>
+                                </template>
+                            </div>
+                        </div>
+                        <div class="card-right">
+                            <template if:true={c.hasBalance}>
+                                <div class="balance-pill">
+                                    &#8377;{c.formattedBalance}
+                                </div>
+                                <div class="balance-label">due</div>
+                            </template>
+                            <template if:false={c.hasBalance}>
+                                <div class="paid-pill">&#10003; Clear</div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <div class="card-bottom">
+                        <template if:true={c.contact}>
+                            <span class="card-detail">
+                                &#128100; {c.contact}
+                            </span>
+                        </template>
+                        <template if:true={c.phone}>
+                            <span class="card-detail">
+                                &#128222; {c.phone}
+                            </span>
+                        </template>
+                        <span class="card-detail sale-count">
+                            &#128666; {c.saleCount} sales
+                        </span>
+                    </div>
+
+                </div>
+            </template>
+        </template>
+
+        <!-- SUPPLIERS TAB -->
+        <template if:true={showingSuppliers}>
+
+            <template if:true={noSuppliers}>
+                <div class="empty-wrap">
+                    <div class="empty-icon">&#127968;</div>
+                    <div class="empty-title">No suppliers found</div>
+                </div>
+            </template>
+
+            <template for:each={suppliers} for:item="s">
+                <div key={s.id} class="supplier-card"
+                    data-id={s.id} onclick={openAccount}>
+
+                    <div class="sup-left">
+                        <div class="sup-avatar">
+                            {s.initial}
+                        </div>
+                        <div class="sup-info">
+                            <div class="sup-name">{s.name}</div>
+                            <div class="sup-meta">
+                                {s.purchases} purchases
+                            </div>
+                            <template if:true={s.phone}>
+                                <div class="sup-phone">
+                                    &#128222; {s.phone}
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <div class="sup-right">
+                        <template if:true={s.hasOutstanding}>
+                            <div class="sup-owe-label">Owed</div>
+                            <div class="sup-owe">
+                                &#8377;{s.formattedOutstanding}
+                            </div>
+                        </template>
+                        <template if:false={s.hasOutstanding}>
+                            <div class="sup-clear">&#10003; Settled</div>
+                        </template>
+                        <div class="sup-arrow">&#8250;</div>
+                    </div>
+
+                </div>
+            </template>
+        </template>
+
+    </template>
+
+    <div class="bottom-space"></div>
+</div>
+</template>
