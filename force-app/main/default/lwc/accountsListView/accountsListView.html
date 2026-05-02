@@ -54,19 +54,17 @@
         <!-- CLIENTS TAB -->
         <template if:true={showingClients}>
 
-            <!-- Outstanding summary bar -->
-            <template if:true={hasOutstanding}>
-                <div class="summary-bar">
-                    <div class="sb-left">
-                        <div class="sb-label">Total Outstanding</div>
-                        <div class="sb-amount">&#8377;{totalOutstanding}</div>
-                    </div>
-                    <div class="sb-right">
-                        <div class="sb-label">Clients with balance</div>
-                        <div class="sb-count">{clientsWithBalance}</div>
-                    </div>
+            <!-- Outstanding summary bar — always visible -->
+            <div class="summary-bar">
+                <div class="sb-left">
+                    <div class="sb-label">Total Outstanding</div>
+                    <div class="sb-amount">&#8377;{totalOutstanding}</div>
                 </div>
-            </template>
+                <div class="sb-right">
+                    <div class="sb-label">Clients with balance</div>
+                    <div class="sb-count">{clientsWithBalance}</div>
+                </div>
+            </div>
 
             <!-- No results -->
             <template if:true={noClients}>
