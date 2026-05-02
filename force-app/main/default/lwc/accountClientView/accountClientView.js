@@ -76,23 +76,48 @@ export default class AccountClientView extends NavigationMixin(LightningElement)
 
     processSales(rawSales) {
         return rawSales.map(s => {
-            const bal = s.Balance_Due__c || 0;
-            const rev = s.Total_Revenue__c || 0;
-            const col = s.Total_Collected__c || 0;
             const os  = s.Order_Status__c || '';
             const ps  = s.Payment_Status__c || '';
+            const rev = s.Total_Revenue__c || 0;
+            const col = s.Total_Collected__c || 0;
+            // Cancelled sales have no outstanding balance
+            const rawBal = s.Balance_Due__c || 0;
+            const bal = os === 'Cancelled' ? 0 : rawBal;
 
             let statusClass = 'pay-badge ';
-            if (ps === 'Fully Paid')         statusClass += 'badge-paid';
+            if (os === 'Cancelled')           statusClass += 'badge-cancelled';
+            else if (ps === 'Fully Paid')     statusClass += 'badge-paid';
             else if (ps === 'Partially Paid') statusClass += 'badge-partial';
             else                              statusClass += 'badge-unpaid';
 
             let orderStatusClass = 'order-badge ';
-            if (os === 'Delivered')           orderStatusClass += 'obadge-delivered';
-            else if (os === 'Out for Delivery') orderStatusClass += 'obadge-transit';
-            else if (os === 'Confirmed')      orderStatusClass += 'obadge-confirmed';
-            else if (os === 'Cancelled')      orderStatusClass += 'obadge-cancelled';
-            else                              orderStatusClass += 'obadge-default';
+            if (os === 'Delivered')              orderStatusClass += 'obadge-delivered';
+            else if (os === 'Out for Delivery')  orderStatusClass += 'obadge-transit';
+            else if (os === 'Confirmed')         orderStatusClass += 'obadge-confirmed';
+            else if (os === 'Cancelled')         orderStatusClass += 'obadge-cancelled';
+            else                                 orderStatusClass += 'obadge-default';
+
+            // Status flow: Confirmed(0) → Out for Delivery(1) → Delivered(2) → Cancelled(3)
+            // Once Delivered or Cancelled — all buttons locked
+            const statusOrder = ['Confirmed', 'Out for Delivery', 'Delivered', 'Cancelled'];
+            const currentIdx  = statusOrder.indexOf(os);
+            const isLocked    = os === 'Delivered' || os === 'Cancelled';
+
+            // Each button: disabled if locked OR if it represents a past/current status
+            const btnClass = (btnStatus) => {
+                const btnIdx = statusOrder.indexOf(btnStatus);
+                const isCurrent = btnStatus === os;
+                const isPast    = btnIdx < currentIdx;
+                const isDisabled = isLocked || isPast || isCurrent;
+                let cls = 'sc-btn ';
+                if (btnStatus === 'Confirmed')         cls += 'sc-confirmed';
+                else if (btnStatus === 'Out for Delivery') cls += 'sc-transit';
+                else if (btnStatus === 'Delivered')    cls += 'sc-delivered';
+                else if (btnStatus === 'Cancelled')    cls += 'sc-cancelled';
+                if (isCurrent) cls += ' sc-active';
+                if (isDisabled) cls += ' sc-disabled';
+                return cls;
+            };
 
             const lineItems = (s.Sale_Line_Items__r || []).map(li => ({
                 ...li,
@@ -113,6 +138,7 @@ export default class AccountClientView extends NavigationMixin(LightningElement)
 
             return {
                 ...s,
+                Balance_Due__c:    bal,   // overridden to 0 if Cancelled
                 isExpanded:        false,
                 formattedDate:     saleDate,
                 formattedRevenue:  rev.toFixed(2),
@@ -125,7 +151,14 @@ export default class AccountClientView extends NavigationMixin(LightningElement)
                 lineItems,
                 hasLineItems:      lineItems.length > 0,
                 payments,
-                hasPayments:       payments.length > 0
+                hasPayments:       payments.length > 0,
+                isCancelled:       os === 'Cancelled',
+                statusDisplay:     os === 'Cancelled' ? 'Cancelled' : ps,
+                statusLocked:      isLocked,
+                btnClassConfirmed: btnClass('Confirmed'),
+                btnClassTransit:   btnClass('Out for Delivery'),
+                btnClassDelivered: btnClass('Delivered'),
+                btnClassCancelled: btnClass('Cancelled')
             };
         });
     }
@@ -156,7 +189,31 @@ export default class AccountClientView extends NavigationMixin(LightningElement)
         const saleId    = e.currentTarget.dataset.id;
         const newStatus = e.currentTarget.dataset.status;
         const sale      = this.sales.find(s => s.Id === saleId);
-        if (!sale || sale.Order_Status__c === newStatus) return;
+        if (!sale) return;
+        if (sale.Order_Status__c === newStatus) return;
+
+        // Block if already Delivered or Cancelled
+        if (sale.statusLocked) {
+            this.dispatchEvent(new ShowToastEvent({
+                title:   'Status Locked',
+                message: 'A ' + sale.Order_Status__c + ' order cannot be changed.',
+                variant: 'warning'
+            }));
+            return;
+        }
+
+        // Block going backwards in the flow
+        const order = ['Confirmed', 'Out for Delivery', 'Delivered', 'Cancelled'];
+        const currentIdx = order.indexOf(sale.Order_Status__c);
+        const newIdx     = order.indexOf(newStatus);
+        if (newIdx <= currentIdx) {
+            this.dispatchEvent(new ShowToastEvent({
+                title:   'Cannot Go Back',
+                message: 'Status can only move forward: Confirmed → Out for Delivery → Delivered.',
+                variant: 'warning'
+            }));
+            return;
+        }
 
         // Optimistic update
         this.sales = this.sales.map(s => {
