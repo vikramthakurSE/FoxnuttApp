@@ -1,5 +1,6 @@
 import { LightningElement, track, wire } from 'lwc';
 import { NavigationMixin } from 'lightning/navigation';
+import { refreshApex } from '@salesforce/apex';
 import getAccounts from '@salesforce/apex/AccountsListController.getAccounts';
 
 export default class AccountsListView extends NavigationMixin(
@@ -12,15 +13,32 @@ export default class AccountsListView extends NavigationMixin(
     @track suppliers     = [];
     @track _searchTimer  = null;
 
+    wiredAccountsResult;
+
     @wire(getAccounts, { searchTerm: '$searchTerm' })
-    wiredAccounts({ data, error }) {
-        if (data) {
+    wiredAccounts(result) {
+        this.wiredAccountsResult = result;
+        if (result.data) {
             this.isLoading = false;
-            this.processData(data);
-        } else if (error) {
+            this.processData(result.data);
+        } else if (result.error) {
             this.isLoading = false;
-            console.error(error);
+            console.error(result.error);
         }
+    }
+
+    connectedCallback() {
+        // Refresh data when user navigates back to this page
+        this._visHandler = () => {
+            if (!document.hidden && this.wiredAccountsResult) {
+                refreshApex(this.wiredAccountsResult);
+            }
+        };
+        document.addEventListener('visibilitychange', this._visHandler);
+    }
+
+    disconnectedCallback() {
+        document.removeEventListener('visibilitychange', this._visHandler);
     }
 
     processData(data) {
