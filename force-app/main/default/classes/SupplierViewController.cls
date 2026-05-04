@@ -39,7 +39,7 @@ public with sharing class SupplierViewController {
         String paymentDate,
         String mode,
         String paidBy,
-        String ReferenceNotes
+        String notes
     ) {
         Manufacturer_Payment__c p = new Manufacturer_Payment__c(
             Purchase__c      = purchaseId,
@@ -47,8 +47,18 @@ public with sharing class SupplierViewController {
             Payment_Date__c  = Date.valueOf(paymentDate),
             Mode_of_Payment__c = mode,
             Paid_By__c       = paidBy,
-            Reference_Notes__c = String.isBlank(ReferenceNotes) ? null : ReferenceNotes
+            Reference_Notes__c         = String.isBlank(notes) ? null : notes
         );
         insert p;
+    }
+
+    @AuraEnabled
+    public static void updateDeliveryStatus(
+        Id purchaseId, String status
+    ) {
+        update new Purchase__c(
+            Id                 = purchaseId,
+            Delivery_Status__c = status
+        );
     }
 }
