@@ -5,6 +5,8 @@ import { getRecord, getFieldValue } from 'lightning/uiRecordApi';
 import { refreshApex } from '@salesforce/apex';
 import getSupplierData from '@salesforce/apex/SupplierViewController.getSupplierData';
 import saveMfrPayment from '@salesforce/apex/SupplierViewController.saveMfrPayment';
+import updateDeliveryStatus from '@salesforce/apex/SupplierViewController.updateDeliveryStatus';
+import saveShrinkage from '@salesforce/apex/SupplierViewController.saveShrinkage';
 
 import NAME_FIELD  from '@salesforce/schema/Account.Name';
 import PHONE_FIELD from '@salesforce/schema/Account.Phone';
@@ -60,9 +62,12 @@ export default class SupplierView extends NavigationMixin(LightningElement) {
 
     processPurchases(raw) {
         return raw.map(p => {
-            const total       = p.Total_Order_Cost__c || 0;
-            const paid        = p.Total_Paid__c || 0;
-            const outstanding = p.Amount_Outstanding__c || 0;
+            const total       = parseFloat(p.Total_Order_Cost__c) || 0;
+            const tax         = parseFloat(p.Tax_Amount__c)        || 0;
+            const paid        = parseFloat(p.Total_Paid__c)        || 0;
+            // Total due = order cost + tax - what's already paid
+            const totalDue    = total + tax;
+            const outstanding = Math.max(0, totalDue - paid);
 
             // Payment status class
             const ps = p.Manufacturer_Payment_Status__c || '';
@@ -88,6 +93,29 @@ export default class SupplierView extends NavigationMixin(LightningElement) {
 
             const outstandingClass = outstanding > 0
                 ? 'fin-val red' : 'fin-val green';
+
+            // Delivery status flow (one-way, locks at Received/Cancelled)
+            const deliveryOrder = [
+                'Order Requested', 'Confirmed',
+                'Out for Delivery', 'Received'
+            ];
+            const curDIdx  = deliveryOrder.indexOf(ds);
+            const dsLocked = ds === 'Received' || ds === 'Cancelled';
+
+            const dsBtnClass = (btnStatus) => {
+                const btnIdx    = deliveryOrder.indexOf(btnStatus);
+                const isCurrent = btnStatus === ds;
+                const isPast    = btnIdx < curDIdx;
+                const isDisabled = dsLocked || isPast || isCurrent;
+                let cls = 'ds-btn ';
+                if (btnStatus === 'Order Requested') cls += 'ds-requested';
+                else if (btnStatus === 'Confirmed')  cls += 'ds-confirmed';
+                else if (btnStatus === 'Out for Delivery') cls += 'ds-transit';
+                else if (btnStatus === 'Received')   cls += 'ds-received';
+                if (isCurrent)  cls += ' ds-active';
+                if (isDisabled) cls += ' ds-disabled';
+                return cls;
+            };
 
             const lineItems = (p.Purchase_Line_Items__r || []).map(li => ({
                 ...li,
@@ -118,21 +146,28 @@ export default class SupplierView extends NavigationMixin(LightningElement) {
             return {
                 ...p,
                 isExpanded: false,
+                isReceived: ds === 'Received',
                 formattedDate: purDate,
-                formattedTotal: total.toFixed(2),
-                formattedPaid: paid.toFixed(2),
+                formattedTotal:       total.toFixed(2),
+                formattedTax:         tax.toFixed(2),
+                formattedTotalDue:    totalDue.toFixed(2),
+                formattedPaid:        paid.toFixed(2),
                 formattedOutstanding: outstanding.toFixed(2),
                 payStatusClass,
                 deliveryClass,
                 outstandingClass,
                 chevronClass: 'pur-chevron',
                 lineItems,
-                hasLineItems: lineItems.length > 0,
+                hasLineItems:  lineItems.length > 0,
                 mfrPayments,
-                hasPayments: mfrPayments.length > 0,
+                hasPayments:   mfrPayments.length > 0,
                 hasOutstanding: outstanding > 0,
-                hasTax: (p.Tax_Amount__c || 0) > 0,
-                formattedTax: (p.Tax_Amount__c || 0).toFixed(2)
+                hasTax:        tax > 0,
+                dsLocked,
+                btnClassRequested: dsBtnClass('Order Requested'),
+                btnClassConfirmed: dsBtnClass('Confirmed'),
+                btnClassTransit:   dsBtnClass('Out for Delivery'),
+                btnClassReceived:  dsBtnClass('Received'),
             };
         });
     }
@@ -145,21 +180,30 @@ export default class SupplierView extends NavigationMixin(LightningElement) {
 
     get totalOrdered() {
         return this.purchases.reduce(
-            (s, p) => s + (p.Total_Order_Cost__c || 0), 0
+            (s, p) => s + (parseFloat(p.Total_Order_Cost__c) || 0), 0
         ).toFixed(2);
     }
     get totalPaid() {
         return this.purchases.reduce(
-            (s, p) => s + (p.Total_Paid__c || 0), 0
+            (s, p) => s + (parseFloat(p.Total_Paid__c) || 0), 0
         ).toFixed(2);
     }
     get totalOutstanding() {
-        return this.purchases.reduce(
-            (s, p) => s + (p.Amount_Outstanding__c || 0), 0
-        ).toFixed(2);
+        // Include tax in total outstanding
+        return this.purchases.reduce((s, p) => {
+            const total = parseFloat(p.Total_Order_Cost__c) || 0;
+            const tax   = parseFloat(p.Tax_Amount__c)       || 0;
+            const paid  = parseFloat(p.Total_Paid__c)       || 0;
+            return s + Math.max(0, total + tax - paid);
+        }, 0).toFixed(2);
     }
     get hasOutstanding() {
-        return this.purchases.some(p => (p.Amount_Outstanding__c || 0) > 0);
+        return this.purchases.some(p => {
+            const total = parseFloat(p.Total_Order_Cost__c) || 0;
+            const tax   = parseFloat(p.Tax_Amount__c)       || 0;
+            const paid  = parseFloat(p.Total_Paid__c)       || 0;
+            return (total + tax - paid) > 0;
+        });
     }
     get brandList() {
         const brands = new Set();
@@ -188,6 +232,29 @@ export default class SupplierView extends NavigationMixin(LightningElement) {
         });
     }
 
+    onShrinkageChange(e) {
+        const lineItemId = e.currentTarget.dataset.lid;
+        const purId      = e.currentTarget.dataset.purid;
+        const shrinkage  = parseFloat(e.target.value) || 0;
+
+        saveShrinkage({ lineItemId, shrinkage })
+            .then(() => {
+                this.dispatchEvent(new ShowToastEvent({
+                    title: 'Shrinkage Saved',
+                    message: shrinkage + ' KG shrinkage recorded.',
+                    variant: 'success'
+                }));
+                return refreshApex(this.wiredResult);
+            })
+            .catch(err => {
+                this.dispatchEvent(new ShowToastEvent({
+                    title: 'Error',
+                    message: err.body?.message || 'Could not save shrinkage.',
+                    variant: 'error'
+                }));
+            });
+    }
+
     viewPurchase(e) {
         this[NavigationMixin.Navigate]({
             type: 'standard__recordPage',
@@ -196,6 +263,62 @@ export default class SupplierView extends NavigationMixin(LightningElement) {
                 actionName: 'view'
             }
         });
+    }
+
+    updateDeliveryStatus(e) {
+        const purId     = e.currentTarget.dataset.id;
+        const newStatus = e.currentTarget.dataset.status;
+        const pur       = this.purchases.find(p => p.Id === purId);
+        if (!pur) return;
+        if (pur.Delivery_Status__c === newStatus) return;
+
+        if (pur.dsLocked) {
+            this.dispatchEvent(new ShowToastEvent({
+                title:   'Status Locked',
+                message: 'A ' + pur.Delivery_Status__c + ' order cannot be changed.',
+                variant: 'warning'
+            }));
+            return;
+        }
+
+        const order = ['Order Requested','Confirmed','Out for Delivery','Received'];
+        const curIdx = order.indexOf(pur.Delivery_Status__c);
+        const newIdx = order.indexOf(newStatus);
+        if (newIdx <= curIdx) {
+            this.dispatchEvent(new ShowToastEvent({
+                title:   'Cannot Go Back',
+                message: 'Status can only move forward.',
+                variant: 'warning'
+            }));
+            return;
+        }
+
+        // Optimistic update
+        this.purchases = this.purchases.map(p => {
+            if (p.Id !== purId) return p;
+            let deliveryClass = 'delivery-badge ';
+            if (newStatus === 'Received')          deliveryClass += 'dbadge-received';
+            else if (newStatus === 'Out for Delivery') deliveryClass += 'dbadge-transit';
+            else if (newStatus === 'Confirmed')    deliveryClass += 'dbadge-pending';
+            else                                   deliveryClass += 'dbadge-pending';
+            return { ...p, Delivery_Status__c: newStatus, deliveryClass, dsLocked: newStatus === 'Received' };
+        });
+
+        updateDeliveryStatus({ purchaseId: purId, status: newStatus })
+            .then(() => {
+                this.dispatchEvent(new ShowToastEvent({
+                    title: 'Status Updated',
+                    message: 'Purchase is now ' + newStatus + '.',
+                    variant: 'success'
+                }));
+                return refreshApex(this.wiredResult);
+            })
+            .catch(err => {
+                this.dispatchEvent(new ShowToastEvent({
+                    title: 'Failed', message: err.body?.message || 'Error.', variant: 'error'
+                }));
+                refreshApex(this.wiredResult);
+            });
     }
 
     newPurchase() {

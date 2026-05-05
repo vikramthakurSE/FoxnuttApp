@@ -167,7 +167,7 @@ export default class QuickPurchaseEntry extends LightningElement {
             key: 'li_' + this.lineItemCounter,
             displayIndex: this.lineItemCounter,
             brand: '', packetType: '',
-            quantity: 0, cost: 0, shrinkage: 0,
+            quantity: 0, cost: 0,
             lineTotal: '0.00', packetCount: 0
         }];
     }
@@ -190,7 +190,7 @@ export default class QuickPurchaseEntry extends LightningElement {
         else if (field === 'packetType') item.packetType = e.target.value;
         else if (field === 'quantity')   item.quantity   = parseFloat(e.target.value) || 0;
         else if (field === 'cost')       item.cost       = parseFloat(e.target.value) || 0;
-        else if (field === 'shrinkage')  item.shrinkage  = parseFloat(e.target.value) || 0;
+        
 
         item.lineTotal   = (item.quantity * item.cost).toFixed(2);
         item.packetCount = this.calcPackets(item.packetType, item.quantity);
@@ -309,7 +309,7 @@ export default class QuickPurchaseEntry extends LightningElement {
             Packet_Type__c:         li.packetType,
             Quantity__c:            li.quantity,
             Landing_Cost_Per_Kg__c: li.cost,
-            Shrinkage__c:           li.shrinkage || 0
+            Shrinkage__c:           0  // entered after receiving, not at order time
         }));
 
         this.isSaving = true;
