@@ -438,6 +438,8 @@
 .ds-confirmed { background: #dbeafe; color: #1e40af; border-color: #93c5fd; }
 .ds-transit   { background: #fef3c7; color: #92400e; border-color: #fcd34d; }
 .ds-received  { background: #d1fae5; color: #065f46; border-color: #6ee7b7; font-weight: 800; }
+.ds-transit   { background: #fef3c7; color: #92400e; border-color: #fcd34d; }
+.ds-received  { background: #d1fae5; color: #065f46; border-color: #6ee7b7; font-weight: 800; }
 .ds-active    { box-shadow: 0 0 0 2.5px currentColor; font-weight: 800; }
 .ds-disabled  { opacity: .38; cursor: not-allowed; }
 .ds-btn:disabled { cursor: not-allowed; pointer-events: none; }

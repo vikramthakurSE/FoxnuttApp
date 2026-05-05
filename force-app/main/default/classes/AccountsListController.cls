@@ -86,17 +86,27 @@ public with sharing class AccountsListController {
         Map<Id, Integer> supplierPurchaseCounts = new Map<Id, Integer>();
 
         if (!supplierIds.isEmpty()) {
+            // Amount_Outstanding__c formula excludes tax.
+            // Compute true outstanding = Total_Order_Cost + Tax - Total_Paid
             for (AggregateResult ar : [
                 SELECT Supplier__c,
-                       SUM(Amount_Outstanding__c) outstanding,
-                       COUNT(Id) purchaseCount
+                       SUM(Total_Order_Cost__c) totalCost,
+                       SUM(Tax_Amount__c)       totalTax,
+                       SUM(Total_Paid__c)       totalPaid,
+                       COUNT(Id)                purchaseCount
                 FROM Purchase__c
                 WHERE Supplier__c IN :supplierIds
                 GROUP BY Supplier__c
             ]) {
                 Id sId = (Id) ar.get('Supplier__c');
-                Decimal out = (Decimal) ar.get('outstanding');
-                supplierOutstanding.put(sId, out != null ? out : 0);
+                Decimal cost  = (Decimal) ar.get('totalCost');
+                Decimal tax   = (Decimal) ar.get('totalTax');
+                Decimal paid  = (Decimal) ar.get('totalPaid');
+                cost  = cost  != null ? cost  : 0;
+                tax   = tax   != null ? tax   : 0;
+                paid  = paid  != null ? paid  : 0;
+                Decimal out = Math.max(0, cost + tax - paid);
+                supplierOutstanding.put(sId, out);
                 supplierPurchaseCounts.put(
                     sId, Integer.valueOf(ar.get('purchaseCount'))
                 );
