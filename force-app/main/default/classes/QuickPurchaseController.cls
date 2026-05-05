@@ -126,5 +126,17 @@ public with sharing class QuickPurchaseController {
             Id            = purchaseId,
             Tax_Amount__c = taxAmount
         );
+
+        // Issue 1: Send email AFTER tax is saved so it includes tax info.
+        // Re-query line items here since Roll-Up may now be committed.
+        List<Purchase_Line_Item__c> lineItems = [
+            SELECT Id, Purchase__c, Brand__c, Packet_Type__c,
+                   Quantity__c, Landing_Cost_Per_Kg__c
+            FROM Purchase_Line_Item__c
+            WHERE Purchase__c = :purchaseId
+        ];
+        if (!lineItems.isEmpty()) {
+            EmailNotificationHelper.sendNewPurchaseAlert(lineItems);
+        }
     }
 }

@@ -231,6 +231,29 @@ export default class SupplierView extends NavigationMixin(LightningElement) {
         });
     }
 
+    onShrinkageChange(e) {
+        const lineItemId = e.currentTarget.dataset.lid;
+        const purId      = e.currentTarget.dataset.purid;
+        const shrinkage  = parseFloat(e.target.value) || 0;
+
+        saveShrinkage({ lineItemId, shrinkage })
+            .then(() => {
+                this.dispatchEvent(new ShowToastEvent({
+                    title: 'Shrinkage Saved',
+                    message: shrinkage + ' KG shrinkage recorded.',
+                    variant: 'success'
+                }));
+                return refreshApex(this.wiredResult);
+            })
+            .catch(err => {
+                this.dispatchEvent(new ShowToastEvent({
+                    title: 'Error',
+                    message: err.body?.message || 'Could not save shrinkage.',
+                    variant: 'error'
+                }));
+            });
+    }
+
     viewPurchase(e) {
         this[NavigationMixin.Navigate]({
             type: 'standard__recordPage',

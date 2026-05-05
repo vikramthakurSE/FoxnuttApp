@@ -399,3 +399,80 @@
     font-weight: 500; margin-bottom: 12px;
 }
 .fin-val.amber { color: #d97706; }
+
+/* ── DELIVERY STATUS CHANGER ──────────────────────────── */
+.status-changer {
+    background: #f9fafb;
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    border: 1.5px solid #f0f0f0;
+}
+.sc-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: #9ca3af;
+    margin-bottom: 8px;
+}
+.sc-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.ds-btn {
+    border: 1.5px solid #e5e7eb;
+    border-radius: 20px;
+    padding: 6px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    background: #f9fafb;
+    color: #374151;
+    -webkit-tap-highlight-color: transparent;
+}
+.ds-btn:active { opacity: .7; }
+.ds-requested { background: #f3f4f6; color: #374151; border-color: #d1d5db; }
+.ds-confirmed { background: #dbeafe; color: #1e40af; border-color: #93c5fd; }
+.ds-transit   { background: #fef3c7; color: #92400e; border-color: #fcd34d; }
+.ds-received  { background: #d1fae5; color: #065f46; border-color: #6ee7b7; font-weight: 800; }
+.ds-active    { box-shadow: 0 0 0 2.5px currentColor; font-weight: 800; }
+.ds-disabled  { opacity: .38; cursor: not-allowed; }
+.ds-btn:disabled { cursor: not-allowed; pointer-events: none; }
+
+/* Financial subtotal row */
+.fin-subtotal {
+    border-top: 1px dashed #e5e7eb;
+    margin-top: 4px;
+    padding-top: 6px;
+    margin-bottom: 4px;
+}
+.fin-val.bold { font-weight: 900; color: #111; font-size: 14px; }
+.fin-val.amber { color: #d97706; }
+
+/* Shrinkage inline edit */
+.shrink-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+}
+.shrink-label {
+    font-size: 11px;
+    color: #9ca3af;
+    white-space: nowrap;
+}
+.shrink-input {
+    width: 72px;
+    border: 1.5px solid #fcd34d;
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 12px;
+    color: #111;
+    background: #fefce8;
+    outline: none;
+    font-family: inherit;
+}
+.shrink-input:focus { border-color: #f59e0b; }
