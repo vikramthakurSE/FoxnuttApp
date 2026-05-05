@@ -6,7 +6,6 @@ import { refreshApex } from '@salesforce/apex';
 import getSupplierData from '@salesforce/apex/SupplierViewController.getSupplierData';
 import saveMfrPayment from '@salesforce/apex/SupplierViewController.saveMfrPayment';
 import updateDeliveryStatus from '@salesforce/apex/SupplierViewController.updateDeliveryStatus';
-import saveShrinkage from '@salesforce/apex/SupplierViewController.saveShrinkage';
 
 import NAME_FIELD  from '@salesforce/schema/Account.Name';
 import PHONE_FIELD from '@salesforce/schema/Account.Phone';

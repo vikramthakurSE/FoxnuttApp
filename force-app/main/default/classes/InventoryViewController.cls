@@ -57,10 +57,28 @@ public with sharing class InventoryViewController {
     public static void updateShrinkage(
         Id inventoryId, Decimal shrinkage
     ) {
-        Inventory__c inv = new Inventory__c(
-            Id          = inventoryId,
-            Shrinkage__c = shrinkage
+        // Re-query to get current totals so we can
+        // correctly compute Remaining and Packet_Count
+        Inventory__c current = [
+            SELECT Id, Total_Quantity__c, Quantity_Sold__c, Packet_Type__c
+            FROM Inventory__c
+            WHERE Id = :inventoryId
+            LIMIT 1
+        ];
+
+        Decimal total = current.Total_Quantity__c != null
+                        ? current.Total_Quantity__c : 0;
+        Decimal sold  = current.Quantity_Sold__c  != null
+                        ? current.Quantity_Sold__c  : 0;
+        Decimal shrink = shrinkage != null ? shrinkage : 0;
+        Decimal remaining = Math.max(0, total - sold - shrink);
+
+        // Packet_Count__c is a formula field — Salesforce recomputes
+        // it automatically once Remaining_Quantity__c is updated.
+        update new Inventory__c(
+            Id                    = inventoryId,
+            Shrinkage__c          = shrink,
+            Remaining_Quantity__c = remaining
         );
-        update inv;
     }
 }
