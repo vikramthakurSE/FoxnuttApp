@@ -35,7 +35,7 @@ public class ClientPaymentHelper {
             FROM Sale__c
             WHERE Client__c IN :accountIds
             AND Balance_Due__c > 0
-            AND Order_Status__c != 'Cancelled'
+            AND Order_Status__c = 'Delivered'
             GROUP BY Client__c
         ]) {
             totalBalance.put(

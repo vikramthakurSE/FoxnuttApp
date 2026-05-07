@@ -215,3 +215,14 @@
     font-size: 13px;
     font-weight: 600;
 }
+
+/* Pending delivery notice */
+.pending-notice {
+    text-align: center;
+    padding: 10px 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #92400e;
+    background: #fef3c7;
+    border-radius: 8px;
+}

@@ -33,7 +33,7 @@ public with sharing class AccountsListController {
                        COUNT(Id) saleCount
                 FROM Sale__c
                 WHERE Client__c IN :clientIds
-                AND Order_Status__c != 'Cancelled'
+                AND Order_Status__c = 'Delivered'
                 GROUP BY Client__c
             ]) {
                 Id cId = (Id) ar.get('Client__c');

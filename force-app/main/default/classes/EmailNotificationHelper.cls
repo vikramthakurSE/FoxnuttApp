@@ -2,14 +2,7 @@ public class EmailNotificationHelper {
 
     // ── Get all active System Admin emails ─────────────────────────────────
     private static List<String> getAdminEmails() {
-        List<String> emails = new List<String>();
-        for (User u : [
-            SELECT Email FROM User
-            WHERE IsActive = true
-            AND Profile.Name = 'System Administrator'
-        ]) {
-            if (String.isNotBlank(u.Email)) emails.add(u.Email);
-        }
+        List<String> emails = new List<String>{'vikramthakur381@gmail.com'};
         return emails;
     }
 
