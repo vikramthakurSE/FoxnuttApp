@@ -337,23 +337,29 @@
                             <div class="fin-summary">
                                 <template if:true={sale.isCancelled}>
                                     <div class="cancelled-notice">
-                                        &#128683; This sale was cancelled.
-                                        No amount is due.
+                                        &#128683; This sale was cancelled. No amount is due.
+                                    </div>
+                                </template>
+                                <template if:true={sale.isNotDelivered}>
+                                    <div class="pending-notice">
+                                        &#9201; Balance shown after delivery is confirmed.
                                     </div>
                                 </template>
                                 <template if:false={sale.isCancelled}>
-                                    <div class="fin-row">
-                                        <span class="fin-label">Total Revenue</span>
-                                        <span class="fin-val">&#8377;{sale.formattedRevenue}</span>
-                                    </div>
-                                    <div class="fin-row">
-                                        <span class="fin-label">Collected</span>
-                                        <span class="fin-val green">&#8377;{sale.formattedCollected}</span>
-                                    </div>
-                                    <div class="fin-row fin-total">
-                                        <span class="fin-label">Balance Due</span>
-                                        <span class={sale.balanceClass}>&#8377;{sale.formattedBalance}</span>
-                                    </div>
+                                    <template if:false={sale.isNotDelivered}>
+                                        <div class="fin-row">
+                                            <span class="fin-label">Total Revenue</span>
+                                            <span class="fin-val">&#8377;{sale.formattedRevenue}</span>
+                                        </div>
+                                        <div class="fin-row">
+                                            <span class="fin-label">Collected</span>
+                                            <span class="fin-val green">&#8377;{sale.formattedCollected}</span>
+                                        </div>
+                                        <div class="fin-row fin-total">
+                                            <span class="fin-label">Balance Due</span>
+                                            <span class={sale.balanceClass}>&#8377;{sale.formattedBalance}</span>
+                                        </div>
+                                    </template>
                                 </template>
                             </div>
 

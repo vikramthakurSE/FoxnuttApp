@@ -1,4 +1,5 @@
 import { LightningElement, track, wire } from 'lwc';
+import { CurrentPageReference } from 'lightning/navigation';
 import { NavigationMixin } from 'lightning/navigation';
 import { refreshApex } from '@salesforce/apex';
 import getAccounts from '@salesforce/apex/AccountsListController.getAccounts';
@@ -27,8 +28,17 @@ export default class AccountsListView extends NavigationMixin(
         }
     }
 
+    // Fires on every navigation in Salesforce mobile app
+    // More reliable than visibilitychange for SF mobile
+    @wire(CurrentPageReference)
+    pageRefHandler(pageRef) {
+        if (pageRef && this.wiredAccountsResult) {
+            refreshApex(this.wiredAccountsResult);
+        }
+    }
+
     connectedCallback() {
-        // Refresh data when user navigates back to this page
+        // visibilitychange handles browser tab switching
         this._visHandler = () => {
             if (!document.hidden && this.wiredAccountsResult) {
                 refreshApex(this.wiredAccountsResult);

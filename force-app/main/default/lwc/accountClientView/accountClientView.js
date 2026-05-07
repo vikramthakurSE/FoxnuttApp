@@ -42,10 +42,15 @@ export default class AccountClientView extends NavigationMixin(LightningElement)
 
     // Balance calculated live from sales — never stale
     get accountBalance() {
-        return this.sales.reduce((s, sale) => s + (parseFloat(sale.Balance_Due__c) || 0), 0).toFixed(2);
+        return this.sales
+            .filter(s => s.Order_Status__c === 'Delivered')
+            .reduce((s, sale) => s + (parseFloat(sale.Balance_Due__c) || 0), 0)
+            .toFixed(2);
     }
     get hasBalance() {
-        return this.sales.some(s => (s.Balance_Due__c || 0) > 0);
+        return this.sales.some(s =>
+            s.Order_Status__c === 'Delivered' && (s.Balance_Due__c || 0) > 0
+        );
     }
 
     // ── Sales wire ─────────────────────────────────────────
@@ -80,9 +85,10 @@ export default class AccountClientView extends NavigationMixin(LightningElement)
             const ps  = s.Payment_Status__c || '';
             const rev = s.Total_Revenue__c || 0;
             const col = s.Total_Collected__c || 0;
-            // Cancelled sales have no outstanding balance
+            // Only Delivered sales have outstanding balance due
+            // Confirmed / Out for Delivery = not yet earned, don't show as due
             const rawBal = s.Balance_Due__c || 0;
-            const bal = os === 'Cancelled' ? 0 : rawBal;
+            const bal = os === 'Delivered' ? rawBal : 0;
 
             let statusClass = 'pay-badge ';
             if (os === 'Cancelled')           statusClass += 'badge-cancelled';
@@ -153,6 +159,7 @@ export default class AccountClientView extends NavigationMixin(LightningElement)
                 payments,
                 hasPayments:       payments.length > 0,
                 isCancelled:       os === 'Cancelled',
+                isNotDelivered:    os !== 'Delivered' && os !== 'Cancelled',
                 statusDisplay:     os === 'Cancelled' ? 'Cancelled' : ps,
                 statusLocked:      isLocked,
                 btnClassConfirmed: btnClass('Confirmed'),
