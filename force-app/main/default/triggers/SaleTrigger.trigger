@@ -1,44 +1,64 @@
-trigger SaleTrigger on Sale__c (after update) {
+trigger SaleTrigger on Sale__c (after insert, after update) {
 
-    Set<Id> deliveredNow   = new Set<Id>(); // just became Delivered
-    Set<Id> undeliveredNow = new Set<Id>(); // was Delivered, now changed
-    List<Id> statusChanged = new List<Id>();
+    // ── AFTER UPDATE: status changes ───────────────────────────────────────
+    // NOTE: WhatsApp integration not active yet — will be added later
+    if (Trigger.isAfter && Trigger.isUpdate) {
 
-    for (Sale__c s : Trigger.new) {
-        Sale__c old = Trigger.oldMap.get(s.Id);
-        if (s.Order_Status__c == old.Order_Status__c) continue;
+        Set<Id> deliveredNow     = new Set<Id>();
+        Set<Id> undeliveredNow   = new Set<Id>();
+        Set<Id> statusChangedIds = new Set<Id>();
 
-        statusChanged.add(s.Id);
+        for (Sale__c s : Trigger.new) {
+            Sale__c oldS = Trigger.oldMap.get(s.Id);
+            if (s.Order_Status__c == oldS.Order_Status__c) continue;
 
-        if (s.Order_Status__c == 'Delivered') {
-            // Status just changed TO Delivered — deduct inventory
-            deliveredNow.add(s.Id);
-        } else if (old.Order_Status__c == 'Delivered') {
-            // Was Delivered, now changed AWAY — return stock
-            undeliveredNow.add(s.Id);
+            statusChangedIds.add(s.Id);
+
+            if (s.Order_Status__c == 'Delivered') {
+                deliveredNow.add(s.Id);
+            } else if (oldS.Order_Status__c == 'Delivered') {
+                undeliveredNow.add(s.Id);
+            }
         }
-    }
 
-    // Deduct inventory when delivered
-    if (!deliveredNow.isEmpty()) {
-        SaleLineItemHelper.onStatusDelivered(deliveredNow);
-    }
+        // Inventory adjustments
+        if (!deliveredNow.isEmpty()) {
+            SaleLineItemHelper.onStatusDelivered(deliveredNow);
+        }
+        if (!undeliveredNow.isEmpty()) {
+            SaleLineItemHelper.onStatusUndelivered(undeliveredNow);
+        }
 
-    // Return inventory if un-delivered (e.g. Cancelled after Delivered)
-    if (!undeliveredNow.isEmpty()) {
-        SaleLineItemHelper.onStatusUndelivered(undeliveredNow);
-    }
+        // Send email for EVERY status change
+        if (!statusChangedIds.isEmpty()) {
+            List<Sale__c> changed = [
+                SELECT Id, Name, Sale_Date__c,
+                       Order_Status__c, Regional_Manager__c,
+                       Total_Revenue__c, Total_Profit__c,
+                       Total_Collected__c, Balance_Due__c,
+                       Payment_Status__c, Client__r.Name
+                FROM Sale__c WHERE Id IN :statusChangedIds
+            ];
 
-    // Send email when delivered
-    if (!deliveredNow.isEmpty()) {
-        List<Sale__c> full = [
-            SELECT Id, Name, Sale_Date__c,
-                   Order_Status__c, Regional_Manager__c,
-                   Total_Revenue__c, Total_Profit__c,
-                   Total_Collected__c, Balance_Due__c,
-                   Payment_Status__c, Client__r.Name
-            FROM Sale__c WHERE Id IN :deliveredNow
-        ];
-        EmailNotificationHelper.sendSaleDelivered(full);
+            // Delivered gets its own detailed email
+            List<Sale__c> delivered = new List<Sale__c>();
+            // All other status changes go through the generic status email
+            List<Sale__c> statusOnly = new List<Sale__c>();
+
+            for (Sale__c s : changed) {
+                if (s.Order_Status__c == 'Delivered') {
+                    delivered.add(s);
+                } else {
+                    statusOnly.add(s);
+                }
+            }
+
+            if (!delivered.isEmpty()) {
+                EmailNotificationHelper.sendSaleDelivered(delivered);
+            }
+            if (!statusOnly.isEmpty()) {
+                EmailNotificationHelper.sendSaleStatusChanged(statusOnly);
+            }
+        }
     }
 }
