@@ -2,7 +2,7 @@ public class EmailNotificationHelper {
 
     // ── Get all active System Admin emails ─────────────────────────────────
     private static List<String> getAdminEmails() {
-        List<String> emails = new List<String>{'vikramthakur381@gmail.com'};
+        List<String> emails = new List<String>{'vikramthakur381@gmail.com','rohanagarwalprp@gmail.com'};
         return emails;
     }
 
@@ -202,6 +202,115 @@ public class EmailNotificationHelper {
         }
     }
 
+
+    // ════════════════════════════════════════════════════════════════════════
+    // 3c. SALE STATUS CHANGED (Confirmed / Out for Delivery / Cancelled)
+    // ════════════════════════════════════════════════════════════════════════
+    // 3c. SALE STATUS CHANGED (Confirmed / Out for Delivery / Cancelled)
+    // ════════════════════════════════════════════════════════════════════════
+    public static void sendSaleStatusChanged(List<Sale__c> sales) {
+        List<String> admins = getAdminEmails();
+
+        for (Sale__c s : sales) {
+            String status = s.Order_Status__c;
+
+            String hBg  = '#1e1b4b';
+            String badge = 'STATUS UPDATE';
+
+            if (status == 'Out for Delivery') {
+                hBg   = '#7c3a00';
+                badge = 'OUT FOR DELIVERY';
+            } else if (status == 'Cancelled') {
+                hBg   = '#450a0a';
+                badge = 'CANCELLED';
+            } else if (status == 'Confirmed') {
+                hBg   = '#052e16';
+                badge = 'CONFIRMED';
+            }
+
+            Decimal rev = s.Total_Revenue__c != null ? s.Total_Revenue__c : 0;
+            Decimal bal = s.Balance_Due__c   != null ? s.Balance_Due__c   : 0;
+
+            // Balance row — no ternary inside string concat
+            String balanceRow;
+            if (status == 'Cancelled') {
+                balanceRow = kvLast('Balance Due', 'Rs 0.00 — Cancelled', '#6b7280');
+            } else if (bal > 0) {
+                balanceRow = kvLast('Balance Due', 'Rs ' + bal.setScale(2), '#dc2626');
+            } else {
+                balanceRow = kvLast('Balance Due', 'Rs 0.00', '#16a34a');
+            }
+
+            // Action box — plain if/else, no nested ternary
+            String actionBox = '';
+            if (status == 'Out for Delivery') {
+                actionBox  = '<table width="100%" cellpadding="0" cellspacing="0" ';
+                actionBox += 'style="background:#fff7ed;border-radius:10px;';
+                actionBox += 'border-left:4px solid #f59e0b;margin-top:12px;">';
+                actionBox += '<tr><td style="padding:16px 20px;">';
+                actionBox += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;';
+                actionBox += 'color:#92400e;margin-bottom:8px;">ACTION REQUIRED</div>';
+                actionBox += '<p style="font-size:12px;color:#374151;margin:0 0 6px;">';
+                actionBox += 'Order is on the way to ' + s.Client__r.Name + '.</p>';
+                actionBox += '<p style="font-size:12px;color:#374151;margin:0 0 6px;">';
+                actionBox += 'Update status to Delivered once handed over.</p>';
+                actionBox += '<p style="font-size:12px;color:#374151;margin:0;">';
+                actionBox += 'Collect Rs ' + bal.setScale(2) + ' on delivery.</p>';
+                actionBox += '</td></tr></table>';
+            } else if (status == 'Cancelled') {
+                actionBox  = '<table width="100%" cellpadding="0" cellspacing="0" ';
+                actionBox += 'style="background:#fef2f2;border-radius:10px;';
+                actionBox += 'border-left:4px solid #ef4444;margin-top:12px;">';
+                actionBox += '<tr><td style="padding:16px 20px;">';
+                actionBox += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;';
+                actionBox += 'color:#991b1b;margin-bottom:8px;">ORDER CANCELLED</div>';
+                actionBox += '<p style="font-size:12px;color:#374151;margin:0;">';
+                actionBox += 'This order has been cancelled. ';
+                actionBox += 'No payment due. Stock returned to inventory.</p>';
+                actionBox += '</td></tr></table>';
+            }
+
+            // Build body
+            String body = '';
+            body += '<p style="font-size:14px;color:#374151;line-height:1.6;';
+            body += 'margin:0 0 20px;">A sale order status has been updated.</p>';
+            body += '<table width="100%" cellpadding="0" cellspacing="0" ';
+            body += 'style="background:#1f2937;border-radius:10px;margin-bottom:16px;">';
+            body += '<tr><td style="padding:20px 24px;text-align:center;">';
+            body += '<div style="font-size:11px;font-weight:700;color:#6b7280;';
+            body += 'text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;">';
+            body += 'CURRENT STATUS</div>';
+            body += '<div style="font-size:26px;font-weight:900;color:#f9fafb;">';
+            body += status + '</div>';
+            body += '</td></tr></table>';
+            body += '<table width="100%" cellpadding="0" cellspacing="0" ';
+            body += 'style="background:#f9fafb;border-radius:10px;margin-bottom:12px;">';
+            body += '<tr><td style="padding:18px 20px;">';
+            body += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;';
+            body += 'letter-spacing:.08em;color:#9ca3af;margin-bottom:12px;">SALE DETAILS</div>';
+            body += '<table width="100%" cellpadding="0" cellspacing="0">';
+            body += kv('Sale Number', s.Name, '');
+            body += kv('Client', s.Client__r.Name, '');
+            body += kv('Sale Date', s.Sale_Date__c != null ? s.Sale_Date__c.format() : '-', '');
+            body += kv('Handled By', s.Regional_Manager__c != null ? s.Regional_Manager__c : '-', '');
+            body += kv('Total Revenue', 'Rs ' + rev.setScale(2), '');
+            body += balanceRow;
+            body += '</table></td></tr></table>';
+            body += actionBox;
+
+            String subject = '[' + status + '] ' + s.Name + ' | ' + s.Client__r.Name;
+
+            sendEmail(
+                subject,
+                wrap(hBg, '#f9fafb',
+                     badge, '#374151', '#d1d5db',
+                     'Sale Status: ' + status,
+                     s.Name + ' - ' + s.Client__r.Name,
+                     body, '#f8fafc', '#94a3b8'),
+                admins
+            );
+        }
+    }
     // ════════════════════════════════════════════════════════════════════════
     // 3. SALE DELIVERED — fires from SaleTrigger after update
     // ════════════════════════════════════════════════════════════════════════
@@ -219,61 +328,55 @@ public class EmailNotificationHelper {
     // ════════════════════════════════════════════════════════════════════════
     // 4. CLIENT PAYMENT RECEIVED — fires from ClientPaymentSummaryTrigger
     // ════════════════════════════════════════════════════════════════════════
+    // Uses @future so Roll-Up fields (Total_Collected, Balance_Due)
+    // have time to commit before the email is built and sent.
     public static void sendPaymentReceived(
         List<Client_Payment__c> payments
     ) {
+        Set<Id> paymentIds = new Set<Id>();
+        for (Client_Payment__c p : payments) {
+            if (p.Id != null) paymentIds.add(p.Id);
+        }
+        if (!paymentIds.isEmpty()) {
+            sendPaymentReceivedAsync(paymentIds);
+        }
+    }
+
+    @future
+    private static void sendPaymentReceivedAsync(Set<Id> paymentIds) {
+        // Re-query payments fresh
+        List<Client_Payment__c> payments = [
+            SELECT Id, Amount__c, Mode_of_Payment__c, Accepted_By__c,
+                   Payment_Date__c, Reference__c, Sale__c
+            FROM Client_Payment__c
+            WHERE Id IN :paymentIds
+        ];
+
         Set<Id> saleIds = new Set<Id>();
         for (Client_Payment__c p : payments) {
             if (p.Sale__c != null) saleIds.add(p.Sale__c);
         }
 
+        // Re-query Sale fresh — Roll-Up has now committed
         Map<Id, Sale__c> sales = new Map<Id, Sale__c>([
-            SELECT Id, Name, Total_Revenue__c,
-                   Total_Collected__c, Balance_Due__c,
-                   Payment_Status__c, Client__r.Name
+            SELECT Id, Name, Sale_Date__c,
+                   Total_Revenue__c, Total_Collected__c,
+                   Balance_Due__c, Payment_Status__c,
+                   Client__r.Name
             FROM Sale__c WHERE Id IN :saleIds
         ]);
 
-        // Collect client IDs from the affected sales
-        Set<Id> clientIds = new Set<Id>();
-        for (Sale__c s : sales.values()) {
-            if (s.Id != null) clientIds.add(s.Id);
-        }
-        // Re-query fresh balance — cannot subquery same object,
-        // so resolve client IDs first then aggregate
-        Set<Id> affectedClientIds = new Set<Id>();
-        for (Sale__c s : [
-            SELECT Client__c FROM Sale__c WHERE Id IN :saleIds
-        ]) {
-            if (s.Client__c != null) affectedClientIds.add(s.Client__c);
-        }
-        Map<Id, Decimal> freshBalances = new Map<Id, Decimal>();
-        if (!affectedClientIds.isEmpty()) {
-            for (AggregateResult ar : [
-                SELECT Client__c, SUM(Balance_Due__c) total
-                FROM Sale__c
-                WHERE Client__c IN :affectedClientIds
-                AND Order_Status__c != 'Cancelled'
-                GROUP BY Client__c
-            ]) {
-                freshBalances.put(
-                    (Id) ar.get('Client__c'),
-                    (Decimal) ar.get('total')
-                );
-            }
-        }
-
         List<String> admins = getAdminEmails();
+
         for (Client_Payment__c p : payments) {
             Sale__c s = sales.get(p.Sale__c);
             if (s == null) continue;
-            String subject = '💰 Payment Received — ₹' +
-                (p.Amount__c != null ? p.Amount__c.setScale(2) : 0) +
-                ' from ' + s.Client__r.Name;
-            Decimal clientBalance =
-                freshBalances.containsKey(s.Id) ? freshBalances.get(s.Id) : 0;
-            sendEmail(subject,
-                buildPaymentReceivedEmail(p, s), admins);
+
+            Decimal amt = p.Amount__c != null ? p.Amount__c : 0;
+            String subject = 'Payment Received — Rs ' +
+                amt.setScale(2) + ' from ' + s.Client__r.Name;
+
+            sendEmail(subject, buildPaymentReceivedEmail(p, s), admins);
         }
     }
 
