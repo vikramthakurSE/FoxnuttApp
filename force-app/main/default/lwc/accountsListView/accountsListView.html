@@ -97,13 +97,27 @@
                             </div>
                         </div>
                         <div class="card-right">
+                            <!-- Out for Delivery badge -->
+                            <template if:true={c.hasOutForDelivery}>
+                                <div class="badge-transit">
+                                    &#128666; {c.outForDeliveryCount} Out for Delivery
+                                </div>
+                            </template>
+                            <!-- Confirmed badge -->
+                            <template if:true={c.hasConfirmed}>
+                                <div class="badge-confirmed">
+                                    &#9989; {c.confirmedCount} Confirmed
+                                </div>
+                            </template>
+                            <!-- Balance due — show whenever there is a balance -->
                             <template if:true={c.hasBalance}>
                                 <div class="balance-pill">
                                     &#8377;{c.formattedBalance}
                                 </div>
                                 <div class="balance-label">due</div>
                             </template>
-                            <template if:false={c.hasBalance}>
+                            <!-- Clear ONLY when no active orders AND no balance -->
+                            <template if:true={c.showClear}>
                                 <div class="paid-pill">&#10003; Clear</div>
                             </template>
                         </div>

@@ -53,17 +53,53 @@ export default class AccountsListView extends NavigationMixin(
 
     processData(data) {
         // Process clients
-        this.clients = (data.clients || []).map(c => {
-            const balance = parseFloat(c.balance) || 0;
-            const hasBalance = balance > 0;
+        const mapped = (data.clients || []).map(c => {
+            const balance           = parseFloat(c.balance) || 0;
+            const hasBalance        = balance > 0;
+            const confirmed         = parseInt(c.confirmedCount)      || 0;
+            const outForDelivery    = parseInt(c.outForDeliveryCount) || 0;
+            const hasConfirmed      = confirmed > 0;
+            const hasOutForDelivery = outForDelivery > 0;
+            const hasActiveOrders   = hasConfirmed || hasOutForDelivery;
+
+            // Show "Clear" ONLY when no active orders AND no balance due
+            const showClear = !hasActiveOrders && !hasBalance;
+
+            // Card border colour priority:
+            // amber = out for delivery, blue = confirmed, orange = due, green = clear
+            let cardClass = 'client-card card-clear';
+            if (hasOutForDelivery)     cardClass = 'client-card card-transit';
+            else if (hasConfirmed)     cardClass = 'client-card card-confirmed';
+            else if (hasBalance)       cardClass = 'client-card card-has-balance';
+
+            // Sort weight: lower = higher in list
+            let sortWeight = 4; // clear
+            if (hasOutForDelivery && hasBalance) sortWeight = 0;
+            else if (hasOutForDelivery)          sortWeight = 1;
+            else if (hasConfirmed && hasBalance) sortWeight = 2;
+            else if (hasBalance)                 sortWeight = 3;
+            else if (hasConfirmed)               sortWeight = 3;
+
             return {
                 ...c,
                 hasBalance,
-                formattedBalance: balance.toFixed(2),
-                cardClass: hasBalance
-                    ? 'client-card card-has-balance'
-                    : 'client-card card-clear'
+                formattedBalance:    balance.toFixed(2),
+                hasConfirmed,
+                hasOutForDelivery,
+                hasActiveOrders,
+                showClear,
+                confirmedCount:      confirmed,
+                outForDeliveryCount: outForDelivery,
+                cardClass,
+                sortWeight,
+                sortBalance: balance
             };
+        });
+
+        // Sort: Out for Delivery+Due → Out for Delivery → Confirmed+Due → Due → Confirmed → Clear
+        this.clients = mapped.sort((a, b) => {
+            if (a.sortWeight !== b.sortWeight) return a.sortWeight - b.sortWeight;
+            return b.sortBalance - a.sortBalance; // higher balance first within same group
         });
 
         // Process suppliers

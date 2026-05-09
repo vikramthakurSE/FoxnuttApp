@@ -22,7 +22,7 @@ public with sharing class AccountsListController {
         Set<Id> clientIds = new Set<Id>();
         for (Account c : clients) clientIds.add(c.Id);
 
-        // Live balance from Sale__c — excludes cancelled sales
+        // Live balance from delivered sales
         Map<Id, Decimal> clientBalances   = new Map<Id, Decimal>();
         Map<Id, Integer> clientSaleCounts = new Map<Id, Integer>();
 
@@ -45,6 +45,30 @@ public with sharing class AccountsListController {
             }
         }
 
+        // Active orders (Confirmed / Out for Delivery) per client
+        Map<Id, Integer> confirmedMap     = new Map<Id, Integer>();
+        Map<Id, Integer> outForDeliveryMap = new Map<Id, Integer>();
+
+        if (!clientIds.isEmpty()) {
+            for (AggregateResult ar : [
+                SELECT Client__c, Order_Status__c,
+                       COUNT(Id) cnt
+                FROM Sale__c
+                WHERE Client__c IN :clientIds
+                AND Order_Status__c IN ('Confirmed', 'Out for Delivery')
+                GROUP BY Client__c, Order_Status__c
+            ]) {
+                Id cId   = (Id)     ar.get('Client__c');
+                String s = (String) ar.get('Order_Status__c');
+                Integer cnt = Integer.valueOf(ar.get('cnt'));
+                if (s == 'Confirmed') {
+                    confirmedMap.put(cId, cnt);
+                } else if (s == 'Out for Delivery') {
+                    outForDeliveryMap.put(cId, cnt);
+                }
+            }
+        }
+
         // Build client rows
         List<Map<String, Object>> clientData =
             new List<Map<String, Object>>();
@@ -63,6 +87,12 @@ public with sharing class AccountsListController {
             row.put('gstin',     c.GSTIN__c);
             row.put('saleCount', clientSaleCounts.containsKey(c.Id)
                                  ? clientSaleCounts.get(c.Id) : 0);
+            row.put('confirmedCount',
+                confirmedMap.containsKey(c.Id)
+                ? confirmedMap.get(c.Id) : 0);
+            row.put('outForDeliveryCount',
+                outForDeliveryMap.containsKey(c.Id)
+                ? outForDeliveryMap.get(c.Id) : 0);
             clientData.add(row);
         }
 
