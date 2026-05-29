@@ -446,3 +446,8 @@
     padding: 2px 7px; border-radius: 10px;
     margin-top: 4px; display: inline-block; font-weight: 700;
 }
+
+/* Opening balance activity entry */
+.opening-icon {
+    background: linear-gradient(135deg, #0ea5e9, #0284c7);
+}

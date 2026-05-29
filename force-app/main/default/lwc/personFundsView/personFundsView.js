@@ -37,25 +37,28 @@ export default class PersonFundsView extends LightningElement {
 
     processData(data) {
         this.expenseTypes      = data.expenseTypes || [];
-        this.teamMembers       = data.teamMembers  || [];
-        this._recentPayments   = data.recentPayments || [];
-        this._recentMfrPayments= data.recentMfrPayments || [];
-        this._recentExpenses   = data.recentExpenses || [];
+        this.teamMembers        = data.teamMembers   || [];
+        this._recentPayments    = data.recentPayments    || [];
+        this._recentMfrPayments = data.recentMfrPayments || [];
+        this._recentExpenses    = data.recentExpenses    || [];
+        this._openingBalances   = data.openingBalances   || [];
 
-        const s = data.summary;
-        if (s) {
-            this.teamCollected   = this.fmt(s.Total_Collected__c);
-            this.teamMfrPaid     = this.fmt(s.Total_Mfr_Paid__c);
-            this.teamExpenses    = this.fmt(s.Total_Expenses__c);
-            this.teamAvailable   = this.fmt(s.Available_Funds__c);
-            this.teamLastUpdated = s.Last_Updated__c
-                ? new Date(s.Last_Updated__c)
-                    .toLocaleString('en-IN', {
-                        day: '2-digit', month: 'short',
-                        hour: '2-digit', minute: '2-digit'
-                    })
-                : '—';
-        }
+        // Compute totals from Person_Fund__c records directly
+        // so it stays in sync even after manual balance adjustments
+        const funds = data.funds || [];
+        const totalCollected  = funds.reduce((s, p) => s + (p.Total_Collected__c || 0), 0);
+        const totalMfrPaid    = funds.reduce((s, p) => s + (p.Total_Mfr_Paid__c  || 0), 0);
+        const totalExpenses   = funds.reduce((s, p) => s + (p.Total_Expenses__c  || 0), 0);
+        const totalAvailable  = totalCollected - totalMfrPaid - totalExpenses;
+
+        this.teamCollected   = this.fmt(totalCollected);
+        this.teamMfrPaid     = this.fmt(totalMfrPaid);
+        this.teamExpenses    = this.fmt(totalExpenses);
+        this.teamAvailable   = this.fmt(totalAvailable);
+        this.teamLastUpdated = new Date().toLocaleString('en-IN', {
+            day: '2-digit', month: 'short',
+            hour: '2-digit', minute: '2-digit'
+        });
 
         this.personFunds = (data.funds || []).map(pf => {
             const avail = pf.Available_Funds__c || 0;
@@ -140,6 +143,20 @@ export default class PersonFundsView extends LightningElement {
                 amtDisplay: '-₹' + this.fmt(e.Amount__c),
                 amtClass:   'txn-amt negative',
                 date:       e.Expense_Date__c
+            }));
+
+        // Opening balance entry — shows funds carried from previous stock
+        this._openingBalances
+            .filter(ob => ob.person === name)
+            .forEach(ob => txns.push({
+                key:        'ob_' + name,
+                icon:       '🏦',
+                iconClass:  'txn-icon opening-icon',
+                title:      'Previous stock balance',
+                meta:       this.fmtDate(ob.date),
+                amtDisplay: '+₹' + this.fmt(ob.amount),
+                amtClass:   'txn-amt positive',
+                date:       ob.date
             }));
 
         return txns

@@ -62,6 +62,44 @@ public with sharing class PersonFundsController {
             if (e.isActive()) teamMembers.add(e.getValue());
         }
 
+        // Compute opening balance per person
+        // = Total_Collected__c minus actual Client_Payment records
+        // Any positive difference = manually added opening balance
+        Map<String, Decimal> actualCollected = new Map<String, Decimal>();
+        for (AggregateResult ar : [
+            SELECT Accepted_By__c person, SUM(Amount__c) total
+            FROM Client_Payment__c
+            WHERE Accepted_By__c != null
+            GROUP BY Accepted_By__c
+        ]) {
+            actualCollected.put(
+                (String) ar.get('person'),
+                (Decimal) ar.get('total')
+            );
+        }
+
+        List<Map<String, Object>> openingBalances =
+            new List<Map<String, Object>>();
+
+        for (Person_Fund__c pf : funds) {
+            Decimal recorded = pf.Total_Collected__c != null
+                               ? pf.Total_Collected__c : 0;
+            Decimal actual   = actualCollected.containsKey(pf.Name)
+                               ? actualCollected.get(pf.Name) : 0;
+            Decimal opening  = recorded - actual;
+
+            if (opening > 0) {
+                openingBalances.add(new Map<String, Object>{
+                    'person'  => pf.Name,
+                    'amount'  => opening,
+                    'date'    => pf.Last_Updated__c != null
+                                 ? String.valueOf(pf.Last_Updated__c)
+                                 : String.valueOf(Date.today()),
+                    'label'   => 'Opening balance — previous stock'
+                });
+            }
+        }
+
         return new Map<String, Object>{
             'funds'             => funds,
             'summary'           => summaries.isEmpty()
@@ -70,7 +108,8 @@ public with sharing class PersonFundsController {
             'recentMfrPayments' => recentMfrPayments,
             'recentExpenses'    => recentExpenses,
             'expenseTypes'      => expenseTypes,
-            'teamMembers'       => teamMembers
+            'teamMembers'       => teamMembers,
+            'openingBalances'   => openingBalances
         };
     }
 
@@ -80,15 +119,15 @@ public with sharing class PersonFundsController {
         String expenseDate,
         String expenseType,
         String spentBy,
-        String remarks
+        String Notes
     ) {
         insert new Expense__c(
             Amount__c       = amount,
             Expense_Date__c = Date.valueOf(expenseDate),
             Expense_Type__c = expenseType,
             Spent_By__c     = spentBy,
-            Notes_Remarks__c  = String.isBlank(remarks)
-                              ? null : remarks
+            Notes_Remarks__c  = String.isBlank(Notes)
+                              ? null : Notes
         );
     }
 
