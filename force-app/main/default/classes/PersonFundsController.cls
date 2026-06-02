@@ -6,7 +6,8 @@ public with sharing class PersonFundsController {
         List<Person_Fund__c> funds = [
             SELECT Id, Name, Total_Collected__c,
                    Total_Mfr_Paid__c, Total_Expenses__c,
-                   Available_Funds__c, Last_Updated__c
+                   Available_Funds__c, Last_Updated__c,
+                   Opening_Balance_Date__c
             FROM Person_Fund__c
             ORDER BY Available_Funds__c DESC NULLS LAST
         ];
@@ -42,7 +43,7 @@ public with sharing class PersonFundsController {
         List<Expense__c> recentExpenses = [
             SELECT Id, Amount__c, Expense_Date__c,
                    Expense_Type__c, Spent_By__c,
-                   Notes_Remarks__c
+                   Notes_Remarks__c 
             FROM Expense__c
             ORDER BY Expense_Date__c DESC, CreatedDate DESC
             LIMIT 20
@@ -92,9 +93,11 @@ public with sharing class PersonFundsController {
                 openingBalances.add(new Map<String, Object>{
                     'person'  => pf.Name,
                     'amount'  => opening,
-                    'date'    => pf.Last_Updated__c != null
-                                 ? String.valueOf(pf.Last_Updated__c)
-                                 : String.valueOf(Date.today()),
+                    'date'    => pf.Opening_Balance_Date__c != null
+                                 ? String.valueOf(pf.Opening_Balance_Date__c).left(10)
+                                 : pf.Last_Updated__c != null
+                                 ? String.valueOf(pf.Last_Updated__c).left(10)
+                                 : String.valueOf(Date.today()).left(10),
                     'label'   => 'Opening balance — previous stock'
                 });
             }
@@ -119,15 +122,15 @@ public with sharing class PersonFundsController {
         String expenseDate,
         String expenseType,
         String spentBy,
-        String Notes
+        String description
     ) {
         insert new Expense__c(
             Amount__c       = amount,
             Expense_Date__c = Date.valueOf(expenseDate),
             Expense_Type__c = expenseType,
             Spent_By__c     = spentBy,
-            Notes_Remarks__c  = String.isBlank(Notes)
-                              ? null : Notes
+            Notes_Remarks__c  = String.isBlank(description)
+                              ? null : description
         );
     }
 

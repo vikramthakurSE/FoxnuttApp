@@ -147,6 +147,10 @@ export default class AccountClientView extends NavigationMixin(LightningElement)
                 Balance_Due__c:    bal,   // overridden to 0 if Cancelled
                 isExpanded:        false,
                 formattedDate:     saleDate,
+                expectedDeliveryDate: s.Expected_Delivery_Date__c
+                    ? new Date(s.Expected_Delivery_Date__c + 'T00:00:00')
+                        .toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'2-digit' })
+                    : null,
                 formattedRevenue:  rev.toFixed(2),
                 formattedCollected: col.toFixed(2),
                 formattedBalance:  bal.toFixed(2),
@@ -339,8 +343,9 @@ export default class AccountClientView extends NavigationMixin(LightningElement)
     @track isSaleOpen       = false;
     @track isSaving         = false;
     @track saleError        = '';
-    @track saleDate         = new Date().toISOString().split('T')[0];
-    @track orderStatus      = 'Confirmed';
+    @track saleDate              = new Date().toISOString().split('T')[0];
+    @track expectedDeliveryDate  = '';
+    @track orderStatus           = 'Confirmed';
     @track saleManager      = '';
     @track lineItems        = [];
     @track lineItemCounter  = 0;
@@ -352,12 +357,15 @@ export default class AccountClientView extends NavigationMixin(LightningElement)
 
     @wire(getInventory)
     wiredInventory({ data }) {
-        if (data) this.inventory = data.map(inv => ({
-            ...inv,
-            stockPillClass: inv.Remaining_Quantity__c <= 0  ? 'stock-pill sp-empty'
-                          : inv.Remaining_Quantity__c < 10 ? 'stock-pill sp-low'
-                          : 'stock-pill sp-ok'
-        }));
+        if (data) {
+            const items = data.inventory || [];
+            this.inventory = items.map(inv => ({
+                ...inv,
+                stockPillClass: (inv.available || 0) <= 0   ? 'stock-pill sp-empty'
+                              : (inv.available || 0) < 10   ? 'stock-pill sp-low'
+                              : 'stock-pill sp-ok'
+            }));
+        }
     }
 
     @wire(getPicklistValues)
@@ -381,11 +389,13 @@ export default class AccountClientView extends NavigationMixin(LightningElement)
 
     resetSaleForm() {
         this.saleDate = new Date().toISOString().split('T')[0];
+        this.expectedDeliveryDate = '';
         this.orderStatus = 'Confirmed'; this.saleManager = '';
         this.lineItems = []; this.lineItemCounter = 0; this.saleError = '';
     }
 
-    onSaleDate(e)  { this.saleDate     = e.target.value; }
+    onSaleDate(e)          { this.saleDate            = e.target.value; }
+    onExpectedDelivery(e)  { this.expectedDeliveryDate = e.target.value; }
     onStatus(e)    { this.orderStatus  = e.target.value; }
     onManager(e)   { this.saleManager  = e.target.value; }
 
@@ -419,9 +429,16 @@ export default class AccountClientView extends NavigationMixin(LightningElement)
         else if (field === 'gst')        item.gstApplied = e.target.checked;
 
         if (item.brand && item.packetType) {
-            const inv = this.inventory.find(i => i.Brand__c === item.brand && i.Packet_Type__c === item.packetType);
-            const avail = inv ? inv.Remaining_Quantity__c : 0;
+            const inv      = this.inventory.find(i => i.Brand__c === item.brand && i.Packet_Type__c === item.packetType);
+            const remaining = inv ? (inv.Remaining_Quantity__c || 0) : 0;
+            const blocked   = inv ? (inv.blocked   || 0) : 0;
+            const avail     = inv ? (inv.available  || 0) : 0;
             item.stockHint    = avail;
+            item.blockedQty   = blocked;
+            item.hasBlocked   = blocked > 0;
+            item.blockedMsg   = blocked > 0
+                ? blocked + ' KG blocked (active orders). Only ' + avail + ' KG available — confirm order for max ' + avail + ' KG.'
+                : '';
             item.stockWarning = item.quantity > avail ? 'Only ' + avail + ' KG available!' : '';
         }
         const base = item.quantity * item.rate;
@@ -447,7 +464,9 @@ export default class AccountClientView extends NavigationMixin(LightningElement)
         saveSale({
             sale: {
                 Client__c: this.recordId, Sale_Date__c: this.saleDate,
-                Order_Status__c: this.orderStatus, Regional_Manager__c: this.saleManager || null
+                Order_Status__c: this.orderStatus,
+                Regional_Manager__c: this.saleManager || null,
+                Expected_Delivery_Date__c: this.expectedDeliveryDate || null
             },
             lineItems: this.lineItems.map(li => ({
                 Brand__c: li.brand, Packet_Type__c: li.packetType,

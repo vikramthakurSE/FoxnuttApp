@@ -838,7 +838,7 @@ public class QuarterlyReportHelper {
     }
 
     private static List<String> getAdminEmails() {
-        List<String> emails = new List<String>{'vikramthakur381@gmail.com'};
+        List<String> emails = new List<String>{'vikramthakur381@gmail.com','rohanagarwalprp@gmail.com'};
         return emails;
     }
 }

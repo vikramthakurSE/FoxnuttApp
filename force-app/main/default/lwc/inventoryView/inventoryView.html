@@ -254,13 +254,26 @@
                         </div>
                         <div class="stock-bar-labels">
                             <span class="sbl-remaining">
-                                {inv.Remaining_Quantity__c} KG remaining
+                                {inv.availableQty} KG available
                             </span>
                             <span class="sbl-total">
                                 of {inv.Total_Quantity__c} KG
                             </span>
                         </div>
                     </div>
+
+                    <!-- Blocked Qty Strip — only shown when active orders exist -->
+                    <template if:true={inv.hasBlocked}>
+                        <div class="blocked-strip">
+                            <span class="blocked-icon">🔒</span>
+                            <span class="blocked-text">
+                                {inv.blockedQty} KG blocked
+                            </span>
+                            <span class="blocked-sub">
+                                — active orders (not yet delivered)
+                            </span>
+                        </div>
+                    </template>
 
                     <!-- Metrics Row -->
                     <div class="inv-metrics">
@@ -277,15 +290,15 @@
                             </div>
                         </div>
                         <div class="im-item">
-                            <div class="im-label">Avg Cost</div>
-                            <div class="im-val">
-                                &#8377;{inv.formattedCost}/kg
+                            <div class="im-label">Blocked</div>
+                            <div class="im-val amber">
+                                {inv.blockedQty} KG
                             </div>
                         </div>
                         <div class="im-item">
-                            <div class="im-label">Value</div>
-                            <div class="im-val green">
-                                &#8377;{inv.formattedValue}
+                            <div class="im-label">Avg Cost</div>
+                            <div class="im-val">
+                                &#8377;{inv.formattedCost}/kg
                             </div>
                         </div>
                     </div>

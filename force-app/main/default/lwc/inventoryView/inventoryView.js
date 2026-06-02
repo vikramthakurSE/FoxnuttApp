@@ -20,53 +20,61 @@ export default class InventoryView extends LightningElement {
         this.wiredResult = result;
         if (result.data) {
             this.isLoading = false;
-            this.processInventory(result.data);
+            // Build blocked map: brand|packetType → blocked KG
+            const blockedMap = {};
+            (result.data.blocked || []).forEach(b => {
+                blockedMap[b.key] = parseFloat(b.blocked) || 0;
+            });
+            this.processInventory(result.data.inventory || [], blockedMap);
         } else if (result.error) {
             this.isLoading = false;
         }
     }
 
-    processInventory(raw) {
+    processInventory(raw, blockedMap) {
         const inStock    = [];
         const outOfStock = [];
 
         raw.forEach(inv => {
-            const remaining = parseFloat(inv.Remaining_Quantity__c) || 0;
-            const total     = parseFloat(inv.Total_Quantity__c)     || 0;
-            const avgCost   = parseFloat(inv.Avg_Cost_Per_Kg__c)    || 0;
-            const sold      = parseFloat(inv.Quantity_Sold__c)      || 0;
-            const value     = remaining * avgCost;
-            const pct       = total > 0
-                ? Math.min(100, (remaining / total) * 100) : 0;
+            const remaining  = parseFloat(inv.Remaining_Quantity__c) || 0;
+            const total      = parseFloat(inv.Total_Quantity__c)     || 0;
+            const avgCost    = parseFloat(inv.Avg_Cost_Per_Kg__c)    || 0;
+            const sold       = parseFloat(inv.Quantity_Sold__c)      || 0;
+            const key        = (inv.Brand__c || '') + '|' + (inv.Packet_Type__c || '');
+            const blocked    = blockedMap[key] || 0;
+            const available  = Math.max(0, remaining - blocked);
+            const value      = available * avgCost;
+            const pct        = total > 0
+                ? Math.min(100, (available / total) * 100) : 0;
 
-            // Stock level classification
+            // Stock classification based on AVAILABLE (not just remaining)
             let stockLabel, stockBadgeClass, cardClass, barClass;
-            if (remaining <= 0) {
+            if (available <= 0 && remaining <= 0) {
                 outOfStock.push(this.processRow(
-                    inv, remaining, total,
-                    avgCost, value, pct
+                    inv, remaining, total, avgCost, value,
+                    pct, blocked, available
                 ));
                 return;
-            } else if (remaining <= LOW_STOCK_THRESHOLD) {
-                stockLabel     = '🔴 Low Stock';
+            } else if (available <= LOW_STOCK_THRESHOLD) {
+                stockLabel      = '🔴 Low Stock';
                 stockBadgeClass = 'stock-badge badge-low';
-                cardClass      = 'inv-card card-low';
-                barClass       = 'stock-bar bar-low';
-            } else if (remaining <= WARN_STOCK_THRESHOLD) {
-                stockLabel     = '🟡 Getting Low';
+                cardClass       = 'inv-card card-low';
+                barClass        = 'stock-bar bar-low';
+            } else if (available <= WARN_STOCK_THRESHOLD) {
+                stockLabel      = '🟡 Getting Low';
                 stockBadgeClass = 'stock-badge badge-warn';
-                cardClass      = 'inv-card card-warn';
-                barClass       = 'stock-bar bar-warn';
+                cardClass       = 'inv-card card-warn';
+                barClass        = 'stock-bar bar-warn';
             } else {
-                stockLabel     = '🟢 In Stock';
+                stockLabel      = '🟢 In Stock';
                 stockBadgeClass = 'stock-badge badge-ok';
-                cardClass      = 'inv-card card-ok';
-                barClass       = 'stock-bar bar-ok';
+                cardClass       = 'inv-card card-ok';
+                barClass        = 'stock-bar bar-ok';
             }
 
             inStock.push({
                 ...this.processRow(inv, remaining, total,
-                    avgCost, value, pct),
+                    avgCost, value, pct, blocked, available),
                 stockLabel,
                 stockBadgeClass,
                 cardClass,
@@ -79,7 +87,7 @@ export default class InventoryView extends LightningElement {
         this.outOfStock = outOfStock;
     }
 
-    processRow(inv, remaining, total, avgCost, value, pct) {
+    processRow(inv, remaining, total, avgCost, value, pct, blocked, available) {
         const lastDate = inv.Last_Purchase_Date__c
             ? new Date(inv.Last_Purchase_Date__c + 'T00:00:00')
                 .toLocaleDateString('en-IN', {
@@ -89,9 +97,12 @@ export default class InventoryView extends LightningElement {
 
         return {
             ...inv,
-            formattedCost:     parseFloat(avgCost || 0).toFixed(2),
-            formattedValue:    parseFloat(value   || 0).toFixed(0),
-            formattedLastDate: lastDate
+            formattedCost:      parseFloat(avgCost   || 0).toFixed(2),
+            formattedValue:     parseFloat(value     || 0).toFixed(0),
+            formattedLastDate:  lastDate,
+            blockedQty:         blocked   || 0,
+            availableQty:       available !== undefined ? available : remaining,
+            hasBlocked:         (blocked  || 0) > 0
         };
     }
 
@@ -100,22 +111,22 @@ export default class InventoryView extends LightningElement {
 
     get totalKg() {
         return this.inventory.reduce(
-            (s, i) => s + (parseFloat(i.Remaining_Quantity__c) || 0), 0
+            (s, i) => s + (parseFloat(i.availableQty) || 0), 0
         ).toFixed(1);
     }
 
     get totalValue() {
         return this.inventory.reduce(
             (s, i) => s + (
-                (parseFloat(i.Remaining_Quantity__c) || 0) *
-                (parseFloat(i.Avg_Cost_Per_Kg__c)    || 0)
+                (parseFloat(i.availableQty)         || 0) *
+                (parseFloat(i.Avg_Cost_Per_Kg__c)   || 0)
             ), 0
         ).toFixed(0);
     }
 
     get lowStockCount() {
         return this.inventory.filter(
-            i => (i.Remaining_Quantity__c || 0) <= LOW_STOCK_THRESHOLD
+            i => (i.availableQty || 0) <= LOW_STOCK_THRESHOLD
         ).length;
     }
 

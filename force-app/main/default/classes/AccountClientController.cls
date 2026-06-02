@@ -4,7 +4,7 @@ public with sharing class AccountClientController {
     public static List<Sale__c> getAccountData(Id accountId) {
         return [
             SELECT
-                Id, Name, Sale_Date__c,
+                Id, Name, Sale_Date__c, Expected_Delivery_Date__c,
                 Order_Status__c, Regional_Manager__c,
                 Total_Revenue__c, Total_Collected__c,
                 Balance_Due__c, Payment_Status__c,

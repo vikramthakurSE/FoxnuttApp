@@ -109,6 +109,12 @@
                                     &#9989; {c.confirmedCount} Confirmed
                                 </div>
                             </template>
+                            <!-- Expected delivery date -->
+                            <template if:true={c.deliveryDateLabel}>
+                                <div class={c.deliveryDateClass}>
+                                    &#128197; {c.deliveryDateLabel}
+                                </div>
+                            </template>
                             <!-- Balance due — show whenever there is a balance -->
                             <template if:true={c.hasBalance}>
                                 <div class="balance-pill">

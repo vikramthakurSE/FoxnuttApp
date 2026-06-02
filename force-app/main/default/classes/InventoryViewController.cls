@@ -1,8 +1,9 @@
 public with sharing class InventoryViewController {
 
     @AuraEnabled(cacheable=true)
-    public static List<Inventory__c> getInventory() {
-        return [
+    public static Map<String, Object> getInventory() {
+        // Inventory records
+        List<Inventory__c> items = [
             SELECT Id, Name, Brand__c, Packet_Type__c,
                    Total_Quantity__c, Remaining_Quantity__c,
                    Quantity_Sold__c, Avg_Cost_Per_Kg__c,
@@ -12,6 +13,41 @@ public with sharing class InventoryViewController {
             ORDER BY Remaining_Quantity__c DESC NULLS LAST,
                      Brand__c ASC
         ];
+
+        // Blocked qty = active sales (Confirmed / Out for Delivery)
+        // not yet delivered — salesman should see this as reserved
+        Map<String, Decimal> blockedMap = new Map<String, Decimal>();
+        for (AggregateResult ar : [
+            SELECT Brand__c brand, Packet_Type__c packetType,
+                   SUM(Quantity__c) qty
+            FROM Sale_Line_Item__c
+            WHERE Sale__r.Order_Status__c IN ('Confirmed', 'Out for Delivery')
+            AND Quantity__c != null
+            GROUP BY Brand__c, Packet_Type__c
+        ]) {
+            String key = (String) ar.get('brand') + '|' +
+                         (String) ar.get('packetType');
+            Decimal qty = (Decimal) ar.get('qty');
+            blockedMap.put(key, qty != null ? qty : 0);
+        }
+
+        // Build blocked list for JS consumption
+        List<Map<String, Object>> blockedList =
+            new List<Map<String, Object>>();
+        for (String key : blockedMap.keySet()) {
+            List<String> parts = key.split('\\|');
+            blockedList.add(new Map<String, Object>{
+                'key'        => key,
+                'brand'      => parts[0],
+                'packetType' => parts.size() > 1 ? parts[1] : '',
+                'blocked'    => blockedMap.get(key)
+            });
+        }
+
+        return new Map<String, Object>{
+            'inventory' => items,
+            'blocked'   => blockedList
+        };
     }
 
     @AuraEnabled(cacheable=true)

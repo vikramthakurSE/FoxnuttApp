@@ -226,3 +226,16 @@
     background: #fef3c7;
     border-radius: 8px;
 }
+
+/* Blocked qty warning in sale line item */
+.lib-blocked {
+    background: #fefce8;
+    border: 1.5px solid #fcd34d;
+    color: #92400e;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 7px 10px;
+    border-radius: 8px;
+    margin-top: 6px;
+    line-height: 1.5;
+}

@@ -58,6 +58,22 @@ export default class AccountsListView extends NavigationMixin(
             const hasBalance        = balance > 0;
             const confirmed         = parseInt(c.confirmedCount)      || 0;
             const outForDelivery    = parseInt(c.outForDeliveryCount) || 0;
+
+            // Format upcoming delivery date
+            let deliveryDateLabel = null;
+            let deliveryIsToday   = false;
+            let deliveryIsTomorrow = false;
+            if (c.upcomingDeliveryDate) {
+                const d     = new Date(c.upcomingDeliveryDate + 'T00:00:00');
+                const today = new Date(); today.setHours(0,0,0,0);
+                const diff  = Math.round((d - today) / (1000 * 60 * 60 * 24));
+                deliveryIsToday    = diff === 0;
+                deliveryIsTomorrow = diff === 1;
+                deliveryDateLabel  = deliveryIsToday  ? 'Deliver Today!'
+                                   : deliveryIsTomorrow ? 'Deliver Tomorrow'
+                                   : d.toLocaleDateString('en-IN',
+                                       { day:'2-digit', month:'short' });
+            }
             const hasConfirmed      = confirmed > 0;
             const hasOutForDelivery = outForDelivery > 0;
             const hasActiveOrders   = hasConfirmed || hasOutForDelivery;
@@ -88,6 +104,13 @@ export default class AccountsListView extends NavigationMixin(
                 hasOutForDelivery,
                 hasActiveOrders,
                 showClear,
+                deliveryDateLabel,
+                deliveryIsToday,
+                deliveryIsTomorrow,
+                deliveryDateClass: deliveryIsToday    ? 'delivery-badge urgent'
+                                 : deliveryIsTomorrow ? 'delivery-badge soon'
+                                 : deliveryDateLabel  ? 'delivery-badge normal'
+                                 : '',
                 confirmedCount:      confirmed,
                 outForDeliveryCount: outForDelivery,
                 cardClass,

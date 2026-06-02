@@ -45,6 +45,22 @@ public with sharing class AccountsListController {
             }
         }
 
+        // Earliest upcoming Expected_Delivery_Date per client
+        Map<Id, Date> upcomingDeliveryMap = new Map<Id, Date>();
+        for (Sale__c s : [
+            SELECT Client__c, Expected_Delivery_Date__c
+            FROM Sale__c
+            WHERE Client__c IN :clientIds
+            AND Expected_Delivery_Date__c >= TODAY
+            AND Order_Status__c IN ('Confirmed', 'Out for Delivery')
+            ORDER BY Expected_Delivery_Date__c ASC
+        ]) {
+            // Keep the earliest date per client
+            if (!upcomingDeliveryMap.containsKey(s.Client__c)) {
+                upcomingDeliveryMap.put(s.Client__c, s.Expected_Delivery_Date__c);
+            }
+        }
+
         // Active orders (Confirmed / Out for Delivery) per client
         Map<Id, Integer> confirmedMap     = new Map<Id, Integer>();
         Map<Id, Integer> outForDeliveryMap = new Map<Id, Integer>();
@@ -93,6 +109,10 @@ public with sharing class AccountsListController {
             row.put('outForDeliveryCount',
                 outForDeliveryMap.containsKey(c.Id)
                 ? outForDeliveryMap.get(c.Id) : 0);
+            row.put('upcomingDeliveryDate',
+                upcomingDeliveryMap.containsKey(c.Id)
+                ? String.valueOf(upcomingDeliveryMap.get(c.Id))
+                : null);
             clientData.add(row);
         }
 
