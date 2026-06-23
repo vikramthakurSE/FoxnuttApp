@@ -451,3 +451,210 @@
 .opening-icon {
     background: linear-gradient(135deg, #0ea5e9, #0284c7);
 }
+
+/* ── Profit Distribution ───────────────────────────────────── */
+.dist-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: linear-gradient(135deg, #1e3a5f, #0f2340);
+    border: none;
+    border-radius: 14px;
+    padding: 16px 20px;
+    cursor: pointer;
+    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.dist-sheet { max-height: 94vh; }
+
+.dist-header {
+    background: linear-gradient(135deg, #1e3a5f, #0f2340);
+}
+
+.dist-already {
+    background: #fff7ed;
+    border: 1.5px solid #fcd34d;
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 12px;
+    color: #92400e;
+    font-weight: 600;
+    margin-bottom: 14px;
+}
+
+/* Profit summary card */
+.dist-summary {
+    background: #0f172a;
+    border-radius: 12px;
+    padding: 16px 18px;
+    margin-bottom: 16px;
+}
+.ds-title {
+    font-size: 10px;
+    font-weight: 700;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    margin-bottom: 12px;
+}
+.ds-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 0;
+}
+.ds-net { padding-top: 10px; }
+.ds-label { font-size: 12px; color: #94a3b8; }
+.ds-val { font-size: 13px; font-weight: 700; color: #f9fafb; }
+.ds-val.green  { color: #4ade80; }
+.ds-val.red    { color: #f87171; }
+.ds-val.amber  { color: #f59e0b; font-size: 16px; }
+.ds-divider {
+    height: 1px;
+    background: #1f2937;
+    margin: 8px 0;
+}
+
+/* Split preview */
+.split-preview {
+    background: #f9fafb;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+    border: 1.5px solid #e5e7eb;
+}
+.sp-title {
+    font-size: 10px;
+    font-weight: 700;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    margin-bottom: 12px;
+}
+.sp-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+.sp-company { border-bottom: none; }
+.sp-person { display: flex; align-items: center; gap: 10px; }
+.sp-avatar {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 800; color: #fff;
+}
+.sp-v { background: #6366f1; }
+.sp-r { background: #10b981; }
+.sp-c { background: #f59e0b; }
+.sp-name { font-size: 13px; font-weight: 700; color: #111; }
+.sp-pct  { font-size: 11px; color: #9ca3af; }
+.sp-amount {
+    font-size: 16px; font-weight: 800; color: #111;
+}
+.form-hint {
+    font-size: 11px; color: #9ca3af; margin-top: 4px;
+}
+
+/* Confirm button */
+.dist-confirm-btn {
+    width: 100%;
+    background: linear-gradient(135deg, #16a34a, #15803d);
+    color: #fff;
+    border: none;
+    border-radius: 14px;
+    padding: 18px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-top: 4px;
+    margin-bottom: 8px;
+}
+.dist-confirm-btn:disabled {
+    background: #d1d5db;
+    cursor: not-allowed;
+}
+
+/* Withdrawal history cards */
+.withdrawal-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.06);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-left: 4px solid #6366f1;
+}
+.wc-quarter { font-size: 13px; font-weight: 700; color: #111; }
+.wc-date    { font-size: 11px; color: #9ca3af; margin-top: 2px; }
+.wc-total   { font-size: 15px; font-weight: 800; color: #6366f1; text-align: right; }
+.wc-split   { font-size: 10px; color: #9ca3af; margin-top: 3px; text-align: right; }
+
+/* ── Adjust Balance ─────────────────────────────────────────── */
+.adj-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: linear-gradient(135deg, #374151, #1f2937);
+    border: none;
+    border-radius: 14px;
+    padding: 16px 20px;
+    cursor: pointer;
+    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.adj-header { background: linear-gradient(135deg, #374151, #1f2937); }
+
+.adj-toggle {
+    display: flex;
+    gap: 8px;
+}
+.adj-toggle-btn {
+    flex: 1;
+    padding: 12px;
+    border-radius: 10px;
+    border: 1.5px solid #e5e7eb;
+    background: #f9fafb;
+    font-size: 14px;
+    font-weight: 600;
+    color: #6b7280;
+    cursor: pointer;
+}
+.adj-active-add {
+    background: #f0fdf4;
+    border-color: #16a34a;
+    color: #16a34a;
+}
+.adj-active-sub {
+    background: #fef2f2;
+    border-color: #dc2626;
+    color: #dc2626;
+}
+
+.adj-save-btn {
+    width: 100%;
+    background: linear-gradient(135deg, #374151, #1f2937);
+    color: #fff;
+    border: none;
+    border-radius: 14px;
+    padding: 18px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-top: 8px;
+}
+.adj-save-btn:disabled { background: #d1d5db; cursor: not-allowed; }
+
+/* Adjustment activity icons */
+.adj-add-icon { background: linear-gradient(135deg, #16a34a, #15803d); }
+.adj-sub-icon { background: linear-gradient(135deg, #dc2626, #b91c1c); }

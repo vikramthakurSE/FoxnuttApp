@@ -38,16 +38,23 @@ public with sharing class AccountClientController {
         String paymentDate,
         String mode,
         String acceptedBy,
-        String reference
+        String reference,
+        Decimal cdPercentage,
+        Decimal cdAmount
     ) {
+        // amount = actual cash received (real money, drives Person Funds)
+        // cdAmount = discount given — added back via Settlement_Amount__c
+        //            formula so the Sale's balance still zeroes out
         Client_Payment__c payment = new Client_Payment__c(
-            Sale__c          = saleId,
-            Amount__c        = amount,
-            Payment_Date__c  = Date.valueOf(paymentDate),
-            Mode_of_Payment__c = mode,
-            Accepted_By__c   = acceptedBy,
-            Reference__c     = String.isBlank(reference)
-                               ? null : reference
+            Sale__c             = saleId,
+            Amount__c           = amount,
+            Payment_Date__c     = Date.valueOf(paymentDate),
+            Mode_of_Payment__c  = mode,
+            Accepted_By__c      = acceptedBy,
+            Reference__c        = String.isBlank(reference)
+                                  ? null : reference,
+            CD_Percentage__c    = cdPercentage != null ? cdPercentage : 0,
+            CD_Amount__c        = cdAmount != null ? cdAmount : 0
         );
         insert payment;
     }

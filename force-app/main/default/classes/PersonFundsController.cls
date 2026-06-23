@@ -7,7 +7,7 @@ public with sharing class PersonFundsController {
             SELECT Id, Name, Total_Collected__c,
                    Total_Mfr_Paid__c, Total_Expenses__c,
                    Available_Funds__c, Last_Updated__c,
-                   Opening_Balance_Date__c
+                   Opening_Balance_Date__c, Adjustment_Log__c
             FROM Person_Fund__c
             ORDER BY Available_Funds__c DESC NULLS LAST
         ];
@@ -43,7 +43,7 @@ public with sharing class PersonFundsController {
         List<Expense__c> recentExpenses = [
             SELECT Id, Amount__c, Expense_Date__c,
                    Expense_Type__c, Spent_By__c,
-                   Notes_Remarks__c 
+                   Notes_Remarks__c
             FROM Expense__c
             ORDER BY Expense_Date__c DESC, CreatedDate DESC
             LIMIT 20
@@ -82,12 +82,51 @@ public with sharing class PersonFundsController {
         List<Map<String, Object>> openingBalances =
             new List<Map<String, Object>>();
 
+        // Parse adjustment logs per person
+        List<Map<String, Object>> adjustmentEntries =
+            new List<Map<String, Object>>();
+
         for (Person_Fund__c pf : funds) {
             Decimal recorded = pf.Total_Collected__c != null
                                ? pf.Total_Collected__c : 0;
             Decimal actual   = actualCollected.containsKey(pf.Name)
                                ? actualCollected.get(pf.Name) : 0;
-            Decimal opening  = recorded - actual;
+
+            // Parse Adjustment_Log__c to extract logged adjustments
+            Decimal totalAdjusted = 0;
+            if (String.isNotBlank(pf.Adjustment_Log__c)) {
+                try {
+                    List<Object> logEntries =
+                        (List<Object>) JSON.deserializeUntyped(
+                            pf.Adjustment_Log__c
+                        );
+                    for (Object entry : logEntries) {
+                        Map<String, Object> e =
+                            (Map<String, Object>) entry;
+                        Decimal amt  = e.get('amount') != null
+                            ? Decimal.valueOf(String.valueOf(e.get('amount'))) : 0;
+                        String  type = (String) e.get('type');
+                        String  dateStr = (String) e.get('date');
+                        String  rsn  = (String) e.get('reason');
+                        if (type == 'Addition') totalAdjusted += amt;
+                        else totalAdjusted -= amt;
+
+                        adjustmentEntries.add(new Map<String, Object>{
+                            'person' => pf.Name,
+                            'amount' => amt,
+                            'type'   => type,
+                            'date'   => dateStr != null
+                                        ? dateStr.left(10) : '',
+                            'reason' => rsn
+                        });
+                    }
+                } catch (Exception ex) {
+                    System.debug('Log parse error: ' + ex.getMessage());
+                }
+            }
+
+            // Opening balance = recorded - actual payments - logged adjustments
+            Decimal opening = recorded - actual - Math.abs(totalAdjusted);
 
             if (opening > 0) {
                 openingBalances.add(new Map<String, Object>{
@@ -112,7 +151,8 @@ public with sharing class PersonFundsController {
             'recentExpenses'    => recentExpenses,
             'expenseTypes'      => expenseTypes,
             'teamMembers'       => teamMembers,
-            'openingBalances'   => openingBalances
+            'openingBalances'   => openingBalances,
+            'adjustmentEntries' => adjustmentEntries
         };
     }
 
@@ -147,5 +187,71 @@ public with sharing class PersonFundsController {
             ORDER BY Expense_Date__c DESC
             LIMIT 50
         ];
+    }
+
+    // ── Manual Balance Adjustment ─────────────────────────────────────────
+    // Updates Total_Collected__c directly:
+    //   Addition     → increase collected (raises available)
+    //   Subtraction  → decrease collected (lowers available)
+    // Safe to use alongside triggers — triggers are delta-based.
+    @AuraEnabled
+    public static void adjustBalance(
+        String personName,
+        Decimal amount,
+        String adjustmentType,
+        String reason
+    ) {
+        if (amount == null || amount <= 0) {
+            throw new AuraHandledException('Amount must be greater than 0.');
+        }
+
+        List<Person_Fund__c> funds = [
+            SELECT Id, Name, Total_Collected__c,
+                   Last_Updated__c, Adjustment_Log__c
+            FROM Person_Fund__c
+            WHERE Name = :personName
+            LIMIT 1
+        ];
+
+        if (funds.isEmpty()) {
+            throw new AuraHandledException(
+                'Person Fund record not found for: ' + personName
+            );
+        }
+
+        Person_Fund__c pf = funds[0];
+
+        // Step 1: Write the log entry FIRST in its own DML
+        // This ensures it persists even if a trigger fires
+        // on the balance update below
+        String today    = String.valueOf(Date.today()).left(10);
+        String newEntry = '{"date":"' + today +
+                          '","amount":' + amount.setScale(2) +
+                          ',"type":"' + adjustmentType +
+                          '","reason":"' + reason.replaceAll('"', '\'') +
+                          '"}';
+
+        String existing = pf.Adjustment_Log__c;
+        String newLog   = String.isBlank(existing)
+                          ? '[' + newEntry + ']'
+                          : existing.removeEnd(']') + ',' + newEntry + ']';
+
+        update new Person_Fund__c(
+            Id                 = pf.Id,
+            Adjustment_Log__c  = newLog
+        );
+
+        // Step 2: Update balance separately
+        Decimal current = pf.Total_Collected__c != null
+                          ? pf.Total_Collected__c : 0;
+        Decimal updated = adjustmentType == 'Addition'
+                          ? current + amount
+                          : current - amount;
+
+        update new Person_Fund__c(
+            Id                 = pf.Id,
+            Total_Collected__c = updated,
+            Last_Updated__c    = Date.today()
+        );
     }
 }
