@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Purchase__c</fullName>
+    <description>MUST be Master-Detail — not Lookup. This is what allows Roll-Up Summary on the parent Purchase. Create this field first. Related To: Purchase. Label: &quot;Purchase&quot;.</description>
+    <label>Purchase</label>
+    <referenceTo>Purchase__c</referenceTo>
+    <relationshipLabel>Purchase Line Items</relationshipLabel>
+    <relationshipName>Purchase_Line_Items</relationshipName>
+    <relationshipOrder>0</relationshipOrder>
+    <reparentableMasterDetail>false</reparentableMasterDetail>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>MasterDetail</type>
+    <writeRequiresMasterRead>false</writeRequiresMasterRead>
+</CustomField>

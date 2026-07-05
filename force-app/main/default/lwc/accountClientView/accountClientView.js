@@ -264,6 +264,9 @@ export default class AccountClientView extends NavigationMixin(LightningElement)
     @track paymentBy       = '';
     @track paymentRef      = '';
     @track paymentError    = '';
+    @track cdPercentage    = '';
+    @track cdAmount        = '0.00';
+    @track cashToCollect   = '0.00';
 
     get paymentModes() { return ['Cash', 'UPI', 'Cheque', 'NEFT/RTGS']; }
     get paymentSaveLabel() { return this.isPaymentSaving ? 'Saving...' : '✓ Record Payment'; }
@@ -295,16 +298,36 @@ export default class AccountClientView extends NavigationMixin(LightningElement)
         this.paymentBy       = '';
         this.paymentRef      = '';
         this.paymentError    = '';
+        this.cdPercentage    = '';
+        this.cdAmount        = '0.00';
+        this.cashToCollect   = bal > 0 ? bal.toFixed(2) : '0.00';
         this.isPaymentOpen   = true;
         this._scrollToTop();
     }
 
     closePaymentModal() { this.isPaymentOpen = false; }
     onPaymentDate(e)    { this.paymentDate   = e.target.value; }
-    onPaymentAmount(e)  { this.paymentAmount = e.target.value; }
+    onPaymentAmount(e)  { this.paymentAmount = e.target.value; this._recalcCd(); }
     onPaymentMode(e)    { this.paymentMode   = e.target.value; }
     onPaymentBy(e)      { this.paymentBy     = e.target.value; }
     onPaymentRef(e)     { this.paymentRef    = e.target.value; }
+
+    // Settling Amount (paymentAmount) = full amount being cleared
+    // against the balance, INCLUDING the discount given.
+    // CD % is applied on this settling amount.
+    // Cash to actually collect = Settling Amount - CD Amount.
+    onCdPercentage(e) {
+        this.cdPercentage = e.target.value;
+        this._recalcCd();
+    }
+
+    _recalcCd() {
+        const settling = parseFloat(this.paymentAmount) || 0;
+        const pct       = parseFloat(this.cdPercentage)  || 0;
+        const cd        = +(settling * pct / 100).toFixed(2);
+        this.cdAmount      = cd.toFixed(2);
+        this.cashToCollect = Math.max(0, settling - cd).toFixed(2);
+    }
 
     handlePaymentSave() {
         this.paymentError = '';
@@ -316,12 +339,15 @@ export default class AccountClientView extends NavigationMixin(LightningElement)
 
         this.isPaymentSaving = true;
         savePayment({
-            saleId:      this.paymentSaleId,
-            amount:      parseFloat(this.paymentAmount),
-            paymentDate: this.paymentDate,
-            mode:        this.paymentMode,
-            acceptedBy:  this.paymentBy,
-            reference:   this.paymentRef || ''
+            saleId:       this.paymentSaleId,
+            // Amount__c stores ACTUAL CASH collected (settling − CD)
+            amount:       parseFloat(this.cashToCollect),
+            paymentDate:  this.paymentDate,
+            mode:         this.paymentMode,
+            acceptedBy:   this.paymentBy,
+            reference:    this.paymentRef || '',
+            cdPercentage: parseFloat(this.cdPercentage) || 0,
+            cdAmount:     parseFloat(this.cdAmount) || 0
         })
         .then(() => {
             this.isPaymentSaving = false;
@@ -330,7 +356,13 @@ export default class AccountClientView extends NavigationMixin(LightningElement)
         })
         .then(() => {
             this.dispatchEvent(new ShowToastEvent({
-                title: 'Payment Recorded', message: '₹' + this.paymentAmount + ' logged.', variant: 'success'
+                title: 'Payment Recorded',
+                message: parseFloat(this.cdAmount) > 0
+                    ? '₹' + this.cashToCollect + ' collected (₹' +
+                      this.cdAmount + ' CD applied, ₹' +
+                      this.paymentAmount + ' settled)'
+                    : '₹' + this.paymentAmount + ' logged.',
+                variant: 'success'
             }));
         })
         .catch(err => {

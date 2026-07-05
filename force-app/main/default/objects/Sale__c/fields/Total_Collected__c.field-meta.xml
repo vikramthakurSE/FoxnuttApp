@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Total_Collected__c</fullName>
+    <description>SUM of Client_Payment__c.Amount__c. Total cash received from client.</description>
+    <inlineHelpText>Total cash received from client.</inlineHelpText>
+    <label>Total Collected</label>
+    <summarizedField>Client_Payment__c.Settlement_Amount__c</summarizedField>
+    <summaryForeignKey>Client_Payment__c.Sale__c</summaryForeignKey>
+    <summaryOperation>sum</summaryOperation>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Summary</type>
+</CustomField>

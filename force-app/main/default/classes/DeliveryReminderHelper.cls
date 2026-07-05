@@ -37,9 +37,11 @@ public class DeliveryReminderHelper {
 
         if (!dueToday.isEmpty()) {
             sendReminderEmail(dueToday, 'today', admins);
+            NotificationHelper.notifyDeliveryReminder(dueToday, true);
         }
         if (!dueTomorrow.isEmpty()) {
             sendReminderEmail(dueTomorrow, 'tomorrow', admins);
+            NotificationHelper.notifyDeliveryReminder(dueTomorrow, false);
         }
     }
 
@@ -203,25 +205,38 @@ public class DeliveryReminderHelper {
         List<OrgWideEmailAddress> owas = [
             SELECT Id FROM OrgWideEmailAddress LIMIT 1
         ];
-        Messaging.SingleEmailMessage mail =
-            new Messaging.SingleEmailMessage();
-        mail.setToAddresses(admins);
-        mail.setSubject(subject);
-        mail.setHtmlBody(html);
-        mail.setSaveAsActivity(false);
-        if (!owas.isEmpty())
-            mail.setOrgWideEmailAddressId(owas[0].Id);
-        try {
-            Messaging.sendEmail(
-                new List<Messaging.SingleEmailMessage>{ mail }
-            );
-        } catch (Exception e) {
-            System.debug('Delivery reminder failed: ' + e.getMessage());
+        List<Messaging.SingleEmailMessage> mails =
+            new List<Messaging.SingleEmailMessage>();
+        for (String addr : admins) {
+            if (String.isBlank(addr)) continue;
+            Messaging.SingleEmailMessage mail =
+                new Messaging.SingleEmailMessage();
+            mail.setToAddresses(new List<String>{ addr });
+            mail.setSubject(subject);
+            mail.setHtmlBody(html);
+            mail.setSaveAsActivity(false);
+            if (!owas.isEmpty())
+                mail.setOrgWideEmailAddressId(owas[0].Id);
+            mails.add(mail);
+        }
+        if (!mails.isEmpty()) {
+            try {
+                Messaging.sendEmail(mails);
+            } catch (Exception e) {
+                System.debug('Delivery reminder failed: ' + e.getMessage());
+            }
         }
     }
 
     private static List<String> getAdminEmails() {
-        List<String> emails = new List<String>{'vikramthakur381@gmail.com','rohanagarwalprp@gmail.com'};
+        List<String> emails = new List<String>();
+        for (User u : [
+            SELECT Email FROM User
+            WHERE IsActive = true
+            AND UserType = 'Standard'
+        ]) {
+            if (String.isNotBlank(u.Email)) emails.add(u.Email);
+        }
         return emails;
     }
 }

@@ -7,6 +7,8 @@ public class EmailNotificationHelper {
     }
 
     // ── Core send method ───────────────────────────────────────────────────
+    // Sends ONE separate email per recipient — fixes DE delivery issue
+    // where setToAddresses with multiple recipients only delivers to first
     private static void sendEmail(
         String subject, String htmlBody, List<String> toAddresses
     ) {
@@ -16,21 +18,29 @@ public class EmailNotificationHelper {
             SELECT Id FROM OrgWideEmailAddress LIMIT 1
         ];
 
-        Messaging.SingleEmailMessage mail =
-            new Messaging.SingleEmailMessage();
-        mail.setToAddresses(toAddresses);
-        mail.setSubject(subject);
-        mail.setHtmlBody(htmlBody);
-        mail.setSaveAsActivity(false);
-        if (!owas.isEmpty()) {
-            mail.setOrgWideEmailAddressId(owas[0].Id);
+        List<Messaging.SingleEmailMessage> mails =
+            new List<Messaging.SingleEmailMessage>();
+
+        for (String addr : toAddresses) {
+            if (String.isBlank(addr)) continue;
+            Messaging.SingleEmailMessage mail =
+                new Messaging.SingleEmailMessage();
+            mail.setToAddresses(new List<String>{ addr });
+            mail.setSubject(subject);
+            mail.setHtmlBody(htmlBody);
+            mail.setSaveAsActivity(false);
+            if (!owas.isEmpty()) {
+                mail.setOrgWideEmailAddressId(owas[0].Id);
+            }
+            mails.add(mail);
         }
-        try {
-            Messaging.sendEmail(
-                new List<Messaging.SingleEmailMessage>{ mail }
-            );
-        } catch (Exception e) {
-            System.debug('Email send failed: ' + e.getMessage());
+
+        if (!mails.isEmpty()) {
+            try {
+                Messaging.sendEmail(mails);
+            } catch (Exception e) {
+                System.debug('Email send failed: ' + e.getMessage());
+            }
         }
     }
 
@@ -378,6 +388,9 @@ public class EmailNotificationHelper {
 
             sendEmail(subject, buildPaymentReceivedEmail(p, s), admins);
         }
+
+        // Push notification — same payments, fresh sale data
+        NotificationHelper.notifyPaymentReceived(payments, sales);
     }
 
     // ════════════════════════════════════════════════════════════════════════

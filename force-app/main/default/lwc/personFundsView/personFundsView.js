@@ -5,6 +5,8 @@ import getFundsData from '@salesforce/apex/PersonFundsController.getFundsData';
 import saveExpense from '@salesforce/apex/PersonFundsController.saveExpense';
 import getExpensesForPerson
     from '@salesforce/apex/PersonFundsController.getExpensesForPerson';
+import adjustBalance
+    from '@salesforce/apex/PersonFundsController.adjustBalance';
 
 export default class PersonFundsView extends LightningElement {
 
@@ -24,6 +26,24 @@ export default class PersonFundsView extends LightningElement {
     _recentMfrPayments = [];
     _recentExpenses    = [];
 
+    // Balance Adjustment
+    @track isAdjOpen   = false;
+    @track isAdjSaving = false;
+    @track adjPerson   = '';
+    @track adjAmount   = '';
+    @track adjType     = 'Addition';
+    @track adjReason   = '';
+    @track adjError    = '';
+    @track withdrawalHistory  = [];
+    // Profit Distribution
+    @track isDistOpen         = false;
+    @track isDistSaving       = false;
+    @track availableQuarters  = [];
+    @track distData           = null;
+    @track distAdjusted       = 0;
+    @track distDate           = new Date().toISOString().split('T')[0];
+    @track distNotes          = '';
+
     @wire(getFundsData)
     wiredData(result) {
         this.wiredResult = result;
@@ -42,6 +62,7 @@ export default class PersonFundsView extends LightningElement {
         this._recentMfrPayments = data.recentMfrPayments || [];
         this._recentExpenses    = data.recentExpenses    || [];
         this._openingBalances   = data.openingBalances   || [];
+        this._adjustmentEntries = data.adjustmentEntries || [];
 
         // Compute totals from Person_Fund__c records directly
         // so it stays in sync even after manual balance adjustments
@@ -95,9 +116,10 @@ export default class PersonFundsView extends LightningElement {
     buildTransactions(name) {
         const txns = [];
 
+        // Collect ALL entries from all sources — no pre-slicing
+        // Final sort + slice(5) determines what's shown
         this._recentPayments
             .filter(p => p.Accepted_By__c === name)
-            .slice(0, 3)
             .forEach(p => txns.push({
                 key:        'cp_' + p.Id,
                 icon:       '💰',
@@ -114,7 +136,6 @@ export default class PersonFundsView extends LightningElement {
 
         this._recentMfrPayments
             .filter(p => p.Paid_By__c === name)
-            .slice(0, 3)
             .forEach(p => txns.push({
                 key:        'mp_' + p.Id,
                 icon:       '🏭',
@@ -131,7 +152,6 @@ export default class PersonFundsView extends LightningElement {
 
         this._recentExpenses
             .filter(e => e.Spent_By__c === name)
-            .slice(0, 3)
             .forEach(e => txns.push({
                 key:        'ex_' + e.Id,
                 icon:       '🧾',
@@ -145,7 +165,7 @@ export default class PersonFundsView extends LightningElement {
                 date:       e.Expense_Date__c
             }));
 
-        // Opening balance entry — shows funds carried from previous stock
+        // Opening balance — old date, only shows if no newer activity pushes it out
         this._openingBalances
             .filter(ob => ob.person === name)
             .forEach(ob => txns.push({
@@ -159,11 +179,32 @@ export default class PersonFundsView extends LightningElement {
                 date:       ob.date
             }));
 
+        // Manual balance adjustments
+        (this._adjustmentEntries || [])
+            .filter(a => a.person === name)
+            .forEach((a, i) => {
+                const isAdd = a.type === 'Addition';
+                txns.push({
+                    key:        'adj_' + name + '_' + i,
+                    icon:       isAdd ? '⬆️' : '⬇️',
+                    iconClass:  isAdd
+                                ? 'txn-icon adj-add-icon'
+                                : 'txn-icon adj-sub-icon',
+                    title:      (isAdd ? 'Balance Added' : 'Balance Deducted'),
+                    meta:       this.fmtDate(a.date) +
+                                (a.reason ? ' · ' + a.reason : ''),
+                    amtDisplay: (isAdd ? '+' : '-') + '₹' + this.fmt(a.amount),
+                    amtClass:   isAdd ? 'txn-amt positive' : 'txn-amt negative',
+                    date:       a.date
+                });
+            });
+
+        // Sort ALL entries newest first, then take top 5
         return txns
             .sort((a, b) => {
-                if (!a.date) return 1;
-                if (!b.date) return -1;
-                return a.date < b.date ? 1 : -1;
+                const da = a.date ? String(a.date).substring(0, 10) : '0000-00-00';
+                const db = b.date ? String(b.date).substring(0, 10) : '0000-00-00';
+                return da < db ? 1 : da > db ? -1 : 0;
             })
             .slice(0, 5);
     }
@@ -177,8 +218,119 @@ export default class PersonFundsView extends LightningElement {
             });
     }
 
+    // Distribution computed getters
+    get distVikramAmt()  { return ((this.distAdjusted || 0) * 0.45).toFixed(2); }
+    get distRohanAmt()   { return ((this.distAdjusted || 0) * 0.45).toFixed(2); }
+    get distCompanyAmt() { return ((this.distAdjusted || 0) * 0.10).toFixed(2); }
+    get hasWithdrawals() { return (this.withdrawalHistory || []).length > 0; }
+
     get noPeople() {
         return !this.isLoading && this.personFunds.length === 0;
+    }
+
+    // ── Profit Distribution ───────────────────────────
+    openDistribution() {
+        this.isDistOpen = true;
+        this.distData   = null;
+        this.distAdjusted = 0;
+        this.distDate   = new Date().toISOString().split('T')[0];
+        this.distNotes  = '';
+        // Load quarters
+        getAvailableQuarters()
+            .then(qs => { this.availableQuarters = qs || []; })
+            .catch(() => {});
+        // Load history
+        this.loadWithdrawalHistory();
+    }
+
+    closeDistribution() { this.isDistOpen = false; }
+
+    loadWithdrawalHistory() {
+        getWithdrawalHistory()
+            .then(list => {
+                this.withdrawalHistory = (list || []).map(w => ({
+                    ...w,
+                    formattedDate:    this.fmtDate(w.Withdrawal_Date__c),
+                    formattedTotal:   this.fmt(w.Adjusted_Profit__c),
+                    formattedVikram:  this.fmt(w.Vikram_Amount__c),
+                    formattedRohan:   this.fmt(w.Rohan_Amount__c),
+                    formattedCompany: this.fmt(w.Company_Reserve__c)
+                }));
+            })
+            .catch(() => {});
+    }
+
+    onDistQuarter(e) {
+        const quarter = e.target.value;
+        if (!quarter) { this.distData = null; return; }
+        getQuarterlyProfit({ quarter })
+            .then(data => {
+                this.distData = {
+                    ...data,
+                    revenueFormatted:    this.fmt(data.revenue),
+                    grossMarginFormatted: this.fmt(data.grossMargin),
+                    expensesFormatted:   this.fmt(data.expenses),
+                    netProfitFormatted:  this.fmt(data.netProfit),
+                    existingVikramFmt:   this.fmt(data.existingVikram),
+                    existingRohanFmt:    this.fmt(data.existingRohan),
+                    existingCompanyFmt:  this.fmt(data.existingCompany)
+                };
+                this.distAdjusted = parseFloat(data.netProfit) || 0;
+            })
+            .catch(err => {
+                this.dispatchEvent(new ShowToastEvent({
+                    title: 'Error', variant: 'error',
+                    message: err.body?.message || 'Could not load profit data.'
+                }));
+            });
+    }
+
+    onDistAdjusted(e) { this.distAdjusted = parseFloat(e.target.value) || 0; }
+    onDistDate(e)     { this.distDate  = e.target.value; }
+    onDistNotes(e)    { this.distNotes = e.target.value; }
+
+    confirmDistribution() {
+        if (!this.distData?.quarter) {
+            this.dispatchEvent(new ShowToastEvent({
+                title: 'Select a quarter', variant: 'warning',
+                message: 'Please select a quarter first.'
+            }));
+            return;
+        }
+        if (!this.distAdjusted || this.distAdjusted <= 0) {
+            this.dispatchEvent(new ShowToastEvent({
+                title: 'Invalid amount', variant: 'warning',
+                message: 'Profit must be greater than 0.'
+            }));
+            return;
+        }
+
+        this.isDistSaving = true;
+        executeDistribution({
+            quarter:        this.distData.quarter,
+            adjustedProfit: this.distAdjusted,
+            withdrawalDate: this.distDate,
+            notes:          this.distNotes
+        })
+        .then(result => {
+            this.isDistSaving = false;
+            this.isDistOpen   = false;
+            this.dispatchEvent(new ShowToastEvent({
+                title:   'Profit Distributed! 🎉',
+                variant: 'success',
+                message: 'Vikram: ₹' + result.vikramAmt +
+                         ' | Rohan: ₹' + result.rohanAmt +
+                         ' | Company: ₹' + result.companyAmt
+            }));
+            return refreshApex(this.wiredResult);
+        })
+        .catch(err => {
+            this.isDistSaving = false;
+            this.dispatchEvent(new ShowToastEvent({
+                title: 'Error', variant: 'error',
+                message: err.body?.message || 'Distribution failed.'
+            }));
+        });
     }
 
     // ── Log Expense ────────────────────────────────────────
@@ -296,5 +448,70 @@ export default class PersonFundsView extends LightningElement {
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             } catch(e) { /* silent */ }
         }, 50);
+    }
+
+    // Adjust balance toggle classes
+    get addBtnClass() {
+        return this.adjType === 'Addition'
+            ? 'adj-toggle-btn adj-active-add'
+            : 'adj-toggle-btn';
+    }
+    get subBtnClass() {
+        return this.adjType === 'Subtraction'
+            ? 'adj-toggle-btn adj-active-sub'
+            : 'adj-toggle-btn';
+    }
+
+    // ── Adjust Balance ──────────────────────────────────────────────────
+    openAdjust() {
+        this.adjPerson  = '';
+        this.adjAmount  = '';
+        this.adjType    = 'Addition';
+        this.adjReason  = '';
+        this.adjError   = '';
+        this.isAdjOpen  = true;
+    }
+    closeAdjust() { this.isAdjOpen = false; }
+
+    onAdjPerson(e)  { this.adjPerson = e.target.value; }
+    onAdjAmount(e)  { this.adjAmount = e.target.value; }
+    onAdjType(e)    { this.adjType   = e.currentTarget.dataset.val; }
+    onAdjReason(e)  { this.adjReason = e.target.value; }
+
+    handleAdjustSave() {
+        this.adjError = '';
+        if (!this.adjPerson) {
+            this.adjError = 'Select a person.'; return;
+        }
+        if (!this.adjAmount || parseFloat(this.adjAmount) <= 0) {
+            this.adjError = 'Enter a valid amount.'; return;
+        }
+        if (!this.adjReason.trim()) {
+            this.adjError = 'Enter a reason.'; return;
+        }
+
+        this.isAdjSaving = true;
+        adjustBalance({
+            personName:     this.adjPerson,
+            amount:         parseFloat(this.adjAmount),
+            adjustmentType: this.adjType,
+            reason:         this.adjReason
+        })
+        .then(() => {
+            this.isAdjSaving = false;
+            this.isAdjOpen   = false;
+            const sign = this.adjType === 'Addition' ? '+' : '-';
+            this.dispatchEvent(new ShowToastEvent({
+                title:   'Balance Adjusted ✓',
+                variant: 'success',
+                message: sign + '₹' + this.adjAmount +
+                         ' applied to ' + this.adjPerson
+            }));
+            return refreshApex(this.wiredResult);
+        })
+        .catch(err => {
+            this.isAdjSaving = false;
+            this.adjError = err.body?.message || 'Adjustment failed.';
+        });
     }
 }

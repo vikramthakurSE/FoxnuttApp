@@ -239,3 +239,33 @@
     margin-top: 6px;
     line-height: 1.5;
 }
+
+/* Cash Discount breakdown in Log Payment modal */
+.cd-breakdown {
+    background: #fefce8;
+    border: 1.5px solid #fcd34d;
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+}
+.cd-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+}
+.cd-label {
+    font-size: 12px;
+    color: #92400e;
+}
+.cd-val {
+    font-size: 13px;
+    font-weight: 700;
+    color: #111;
+}
+.cd-discount { color: #d97706; }
+.cd-total {
+    border-top: 1px solid #fde68a;
+    margin-top: 4px;
+    padding-top: 8px;
+}
+.cd-cash { color: #16a34a; font-size: 15px; }

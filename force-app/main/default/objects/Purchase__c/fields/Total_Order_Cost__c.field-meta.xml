@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Total_Order_Cost__c</fullName>
+    <description>auto-sums every line item&apos;s (Qty × Cost). Updates live whenever a line item is added/edited/deleted.</description>
+    <inlineHelpText>auto-sums every line item&apos;s (Qty × Cost). Updates live whenever a line item is added/edited/deleted.</inlineHelpText>
+    <label>Total Order Cost</label>
+    <summarizedField>Purchase_Line_Item__c.Line_Total__c</summarizedField>
+    <summaryForeignKey>Purchase_Line_Item__c.Purchase__c</summaryForeignKey>
+    <summaryOperation>sum</summaryOperation>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Summary</type>
+</CustomField>

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Packet_Count__c</fullName>
+    <externalId>false</externalId>
+    <formula>ROUND(
+  CASE(TEXT(Packet_Type__c),
+    &quot;100g&quot;, Quantity__c * 10,
+    &quot;250g&quot;, Quantity__c * 4,
+    0),
+0)</formula>
+    <formulaTreatBlanksAs>BlankAsZero</formulaTreatBlanksAs>
+    <label>Packet Count</label>
+    <precision>18</precision>
+    <required>false</required>
+    <scale>2</scale>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Number</type>
+    <unique>false</unique>
+</CustomField>

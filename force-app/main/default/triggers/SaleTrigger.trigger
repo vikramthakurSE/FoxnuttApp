@@ -1,7 +1,20 @@
 trigger SaleTrigger on Sale__c (after insert, after update) {
 
+    // ── AFTER INSERT: new sale created → push notification ────────────────
+    // Email already sent via SaleLineItemHelper.onInsert (line items needed)
+    if (Trigger.isAfter && Trigger.isInsert) {
+        List<Sale__c> withClient = [
+            SELECT Id, Name, Order_Status__c,
+                   Total_Revenue__c, Client__r.Name
+            FROM Sale__c
+            WHERE Id IN :Trigger.newMap.keySet()
+        ];
+        if (!withClient.isEmpty()) {
+            NotificationHelper.notifyNewSale(withClient);
+        }
+    }
+
     // ── AFTER UPDATE: status changes ───────────────────────────────────────
-    // NOTE: WhatsApp integration not active yet — will be added later
     if (Trigger.isAfter && Trigger.isUpdate) {
 
         Set<Id> deliveredNow     = new Set<Id>();
@@ -29,7 +42,7 @@ trigger SaleTrigger on Sale__c (after insert, after update) {
             SaleLineItemHelper.onStatusUndelivered(undeliveredNow);
         }
 
-        // Send email for EVERY status change
+        // Send email + push notification for EVERY status change
         if (!statusChangedIds.isEmpty()) {
             List<Sale__c> changed = [
                 SELECT Id, Name, Sale_Date__c,
@@ -59,6 +72,9 @@ trigger SaleTrigger on Sale__c (after insert, after update) {
             if (!statusOnly.isEmpty()) {
                 EmailNotificationHelper.sendSaleStatusChanged(statusOnly);
             }
+
+            // Push notification for ALL status changes (Delivered + others)
+            NotificationHelper.notifyStatusChanged(changed);
         }
     }
 }

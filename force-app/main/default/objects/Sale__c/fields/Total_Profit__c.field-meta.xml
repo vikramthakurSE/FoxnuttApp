@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Total_Profit__c</fullName>
+    <description>SUM of Sale_Line_Item__c.Line_Profit__c. Total profit from this sale.</description>
+    <inlineHelpText>Total profit from this sale.</inlineHelpText>
+    <label>Total Profit</label>
+    <summarizedField>Sale_Line_Item__c.Line_Profit__c</summarizedField>
+    <summaryForeignKey>Sale_Line_Item__c.Sale__c</summaryForeignKey>
+    <summaryOperation>sum</summaryOperation>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Summary</type>
+</CustomField>

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Area__c</fullName>
+    <label>Area</label>
+    <required>false</required>
+    <trackFeedHistory>false</trackFeedHistory>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value>
+                <fullName>RT Nagar</fullName>
+                <default>false</default>
+                <label>RT Nagar</label>
+            </value>
+            <value>
+                <fullName>Sanjaynagara - Vicinity</fullName>
+                <default>false</default>
+                <label>Sanjaynagara - Vicinity</label>
+            </value>
+            <value>
+                <fullName>Sultan Palya</fullName>
+                <default>false</default>
+                <label>Sultan Palya</label>
+            </value>
+            <value>
+                <fullName>New Bel Rd</fullName>
+                <default>false</default>
+                <label>New Bel Rd</label>
+            </value>
+            <value>
+                <fullName>Other</fullName>
+                <default>false</default>
+                <label>Other</label>
+            </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

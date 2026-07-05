@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Manufacturer_Payment_Status__c</fullName>
+    <externalId>false</externalId>
+    <formula>IF(Total_Paid__c = 0, &quot;Unpaid&quot;,
+IF(Total_Paid__c &gt;= Total_Order_Cost__c, &quot;Fully Paid&quot;,
+&quot;Partially Paid&quot;))</formula>
+    <formulaTreatBlanksAs>BlankAsZero</formulaTreatBlanksAs>
+    <label>Manufacturer Payment Status</label>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>
