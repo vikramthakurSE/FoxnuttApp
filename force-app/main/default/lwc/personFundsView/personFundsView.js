@@ -414,6 +414,11 @@ export default class PersonFundsView extends LightningElement {
     @track isHistoryOpen    = false;
     @track isHistoryLoading = false;
     @track historyPerson    = '';
+    // View All Activity
+    @track isActivityOpen    = false;
+    @track isActivityLoading = false;
+    @track activityPerson    = '';
+    @track allActivityTxns   = [];
     @track expenseHistory   = [];
 
     get noExpenseHistory() {
@@ -441,6 +446,107 @@ export default class PersonFundsView extends LightningElement {
     }
 
     closeHistory() { this.isHistoryOpen = false; }
+
+    // ── View All Activity ───────────────────────────────────────────────
+    get noActivityHistory() {
+        return !this.isActivityLoading && this.allActivityTxns.length === 0;
+    }
+
+    openActivity(e) {
+        const person = e.currentTarget.dataset.person;
+        this.activityPerson    = person;
+        this.isActivityOpen    = true;
+        this.isActivityLoading = true;
+
+        // Build full transaction list — same as buildTransactions but no slice limit
+        try {
+            const txns = [];
+
+            this._recentPayments
+                .filter(p => p.Accepted_By__c === person)
+                .forEach(p => txns.push({
+                    key:        'cp_' + p.Id,
+                    icon:       '💰',
+                    iconClass:  'txn-icon collect-icon',
+                    title:      (p.Sale__r?.Client__r?.Name) || 'Client Payment',
+                    meta:       this.fmtDate(p.Payment_Date__c),
+                    amtDisplay: '+₹' + this.fmt(p.Amount__c),
+                    amtClass:   'txn-amt positive',
+                    date:       p.Payment_Date__c
+                }));
+
+            this._recentMfrPayments
+                .filter(p => p.Paid_By__c === person)
+                .forEach(p => txns.push({
+                    key:        'mp_' + p.Id,
+                    icon:       '🏭',
+                    iconClass:  'txn-icon mfr-icon',
+                    title:      (p.Purchase__r?.Supplier__r?.Name) || 'Mfr Payment',
+                    meta:       this.fmtDate(p.Payment_Date__c),
+                    amtDisplay: '-₹' + this.fmt(p.Amount_Paid__c),
+                    amtClass:   'txn-amt negative',
+                    date:       p.Payment_Date__c
+                }));
+
+            this._recentExpenses
+                .filter(e => e.Spent_By__c === person)
+                .forEach(e => txns.push({
+                    key:        'ex_' + e.Id,
+                    icon:       '🧾',
+                    iconClass:  'txn-icon expense-icon',
+                    title:      e.Expense_Type__c || 'Expense',
+                    meta:       this.fmtDate(e.Expense_Date__c) +
+                                (e.Description__c ? ' · ' + e.Description__c : ''),
+                    amtDisplay: '-₹' + this.fmt(e.Amount__c),
+                    amtClass:   'txn-amt negative',
+                    date:       e.Expense_Date__c
+                }));
+
+            (this._openingBalances || [])
+                .filter(ob => ob.person === person)
+                .forEach(ob => txns.push({
+                    key:        'ob_' + person,
+                    icon:       '🏦',
+                    iconClass:  'txn-icon opening-icon',
+                    title:      'Previous stock balance',
+                    meta:       this.fmtDate(ob.date),
+                    amtDisplay: '+₹' + this.fmt(ob.amount),
+                    amtClass:   'txn-amt positive',
+                    date:       ob.date
+                }));
+
+            (this._adjustmentEntries || [])
+                .filter(a => a.person === person)
+                .forEach((a, i) => {
+                    const isAdd = a.type === 'Addition';
+                    txns.push({
+                        key:        'adj_' + person + '_' + i,
+                        icon:       isAdd ? '⬆️' : '⬇️',
+                        iconClass:  isAdd ? 'txn-icon adj-add-icon'
+                                         : 'txn-icon adj-sub-icon',
+                        title:      isAdd ? 'Balance Added' : 'Balance Deducted',
+                        meta:       this.fmtDate(a.date) +
+                                    (a.reason ? ' · ' + a.reason : ''),
+                        amtDisplay: (isAdd ? '+' : '-') + '₹' + this.fmt(a.amount),
+                        amtClass:   isAdd ? 'txn-amt positive' : 'txn-amt negative',
+                        date:       a.date
+                    });
+                });
+
+            // Sort newest first — NO slice limit
+            this.allActivityTxns = txns.sort((a, b) => {
+                const da = a.date ? String(a.date).substring(0, 10) : '0000-00-00';
+                const db = b.date ? String(b.date).substring(0, 10) : '0000-00-00';
+                return da < db ? 1 : da > db ? -1 : 0;
+            });
+
+            this.isActivityLoading = false;
+        } catch(err) {
+            this.isActivityLoading = false;
+        }
+    }
+
+    closeActivity() { this.isActivityOpen = false; }
 
     _scrollToTop() {
         setTimeout(() => {
