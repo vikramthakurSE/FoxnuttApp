@@ -364,6 +364,67 @@
     </template>
 
     <!-- EXPENSE HISTORY MODAL -->
+    <!-- VIEW ALL ACTIVITY MODAL -->
+    <template if:true={isActivityOpen}>
+        <div class="modal-backdrop" onclick={closeActivity}></div>
+        <div class="modal-sheet">
+            <div class="modal-handle"></div>
+            <div class="modal-header activity-header">
+                <div class="modal-title-wrap">
+                    <div class="modal-title">
+                        {activityPerson}'s Activity
+                    </div>
+                    <div class="modal-sub">All transactions</div>
+                </div>
+                <button class="modal-close"
+                    onclick={closeActivity}>&#10005;</button>
+            </div>
+            <div class="modal-body">
+                <template if:true={isActivityLoading}>
+                    <div class="loading-wrap">
+                        <div class="spinner"></div>
+                    </div>
+                </template>
+                <template if:false={isActivityLoading}>
+                    <template if:true={noActivityHistory}>
+                        <div class="empty-wrap">
+                            <div class="empty-icon">&#128202;</div>
+                            <div class="empty-title">
+                                No activity yet
+                            </div>
+                        </div>
+                    </template>
+                    <template for:each={allActivityTxns}
+                        for:item="txn">
+                        <div key={txn.key} class="hist-card">
+                            <div class="hist-left">
+                                <div class="txn-row">
+                                    <span class={txn.iconClass}>
+                                        {txn.icon}
+                                    </span>
+                                    <div>
+                                        <div class="hist-type">
+                                            {txn.title}
+                                        </div>
+                                        <div class="hist-meta">
+                                            {txn.meta}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="hist-right">
+                                <div class={txn.amtClass}>
+                                    {txn.amtDisplay}
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </template>
+            </div>
+        </div>
+    </template>
+
+    <!-- VIEW ALL EXPENSES MODAL -->
     <template if:true={isHistoryOpen}>
         <div class="modal-backdrop" onclick={closeHistory}></div>
         <div class="modal-sheet">
@@ -621,6 +682,11 @@
                         data-person={pf.Name}
                         onclick={openHistory}>
                         &#128179; View All Expenses
+                    </button>
+                    <button class="view-activity-btn"
+                        data-person={pf.Name}
+                        onclick={openActivity}>
+                        &#128202; View All Activity
                     </button>
                 </div>
 
