@@ -74,6 +74,9 @@ public with sharing class InventoryViewController {
             SELECT Id, Sale__r.Name,
                    Sale__r.Sale_Date__c,
                    Sale__r.Client__r.Name,
+                   Sale__r.Total_CD_Amount__c,
+                   Sale__r.Effective_Revenue__c,
+                   Sale__r.Total_Revenue__c,
                    Quantity__c, Rate_Per_Kg__c,
                    Line_Amount__c, Line_Profit__c
             FROM Sale_Line_Item__c

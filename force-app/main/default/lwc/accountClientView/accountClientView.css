@@ -269,3 +269,27 @@
     padding-top: 8px;
 }
 .cd-cash { color: #16a34a; font-size: 15px; }
+
+/* CD applied note in financial summary */
+.cd-note-row { opacity: 0.85; }
+.cd-note-label {
+    font-size: 11px !important;
+    color: #d97706 !important;
+    font-style: italic;
+}
+.cd-note-val {
+    font-size: 11px !important;
+    color: #d97706 !important;
+    font-weight: 600;
+}
+
+/* Financial breakdown improvements */
+.fin-divider {
+    height: 1px;
+    background: #e5e7eb;
+    margin: 6px 0;
+}
+.fin-bold { font-weight: 800 !important; color: #111 !important; }
+.fin-invoice { padding-top: 2px; }
+.fin-net     { padding-top: 2px; }
+.fin-cd-row  { padding: 2px 0; }
