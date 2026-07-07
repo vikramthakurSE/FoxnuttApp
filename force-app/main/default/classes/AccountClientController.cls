@@ -9,6 +9,8 @@ public with sharing class AccountClientController {
                 Total_Revenue__c, Total_Collected__c,
                 Balance_Due__c, Payment_Status__c,
                 Total_Profit__c, Notes_Remarks__c,
+                Effective_Revenue__c, Effective_Profit__c,
+                Total_CD_Amount__c,
                 (
                     SELECT Id, Brand__c, Packet_Type__c,
                            Quantity__c, Rate_Per_Kg__c,

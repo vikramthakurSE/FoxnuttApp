@@ -249,18 +249,33 @@ export default class InventoryView extends LightningElement {
                 )
             }));
 
-            this.detailSales = (data.sales || []).map(s => ({
-                ...s,
-                formattedDate: s.Sale__r.Sale_Date__c
-                    ? new Date(s.Sale__r.Sale_Date__c + 'T00:00:00')
-                        .toLocaleDateString('en-IN', {
-                            day: '2-digit', month: 'short',
-                            year: '2-digit'
-                        })
-                    : '—',
-                formattedRevenue: (s.Line_Amount__c || 0).toFixed(2),
-                formattedProfit:  (s.Line_Profit__c || 0).toFixed(2)
-            }));
+            this.detailSales = (data.sales || []).map(s => {
+                const lineAmt   = s.Line_Amount__c   || 0;
+                const lineProfit = s.Line_Profit__c  || 0;
+                const saleCd    = s.Sale__r?.Total_CD_Amount__c || 0;
+                const saleRev   = s.Sale__r?.Total_Revenue__c  || 0;
+
+                // Apportion CD to this line item by its share of sale revenue
+                const cdShare   = saleRev > 0
+                    ? (lineAmt / saleRev) * saleCd : 0;
+                const effectiveRevenue = Math.max(0, lineAmt - cdShare);
+                const effectiveProfit  = Math.max(0, lineProfit - cdShare);
+
+                return {
+                    ...s,
+                    formattedDate: s.Sale__r.Sale_Date__c
+                        ? new Date(s.Sale__r.Sale_Date__c + 'T00:00:00')
+                            .toLocaleDateString('en-IN', {
+                                day: '2-digit', month: 'short',
+                                year: '2-digit'
+                            })
+                        : '—',
+                    formattedRevenue: effectiveRevenue.toFixed(2),
+                    formattedProfit:  effectiveProfit.toFixed(2),
+                    hasCd:     saleCd > 0,
+                    cdAmount:  cdShare.toFixed(2)
+                };
+            });
         })
         .catch(() => { this.isDetailLoading = false; });
     }

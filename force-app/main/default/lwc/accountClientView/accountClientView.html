@@ -396,17 +396,59 @@
                                 </template>
                                 <template if:false={sale.isCancelled}>
                                     <template if:false={sale.isNotDelivered}>
-                                        <div class="fin-row">
-                                            <span class="fin-label">Total Revenue</span>
-                                            <span class="fin-val">&#8377;{sale.formattedRevenue}</span>
-                                        </div>
-                                        <div class="fin-row">
-                                            <span class="fin-label">Collected</span>
-                                            <span class="fin-val green">&#8377;{sale.formattedCollected}</span>
-                                        </div>
-                                        <div class="fin-row fin-total">
-                                            <span class="fin-label">Balance Due</span>
-                                            <span class={sale.balanceClass}>&#8377;{sale.formattedBalance}</span>
+                                        <div class="fin-summary">
+
+                                            <!-- Line items total -->
+                                            <div class="fin-row">
+                                                <span class="fin-label">Products Total</span>
+                                                <span class="fin-val">&#8377;{sale.lineTotal}</span>
+                                            </div>
+
+                                            <!-- GST row — only shown if GST exists -->
+                                            <template if:true={sale.hasGst}>
+                                                <div class="fin-row">
+                                                    <span class="fin-label">+ GST ({sale.gstPct}%)</span>
+                                                    <span class="fin-val">&#8377;{sale.gstAmount}</span>
+                                                </div>
+                                            </template>
+
+                                            <!-- Invoice total divider -->
+                                            <div class="fin-divider"></div>
+                                            <div class="fin-row fin-invoice">
+                                                <span class="fin-label fin-bold">Invoice Total</span>
+                                                <span class="fin-val fin-bold">&#8377;{sale.invoiceTotal}</span>
+                                            </div>
+
+                                            <!-- CD row — only shown when CD was applied -->
+                                            <template if:true={sale.hasCd}>
+                                                <div class="fin-row fin-cd-row">
+                                                    <span class="fin-label cd-note-label">
+                                                        &#128281; CD Discount
+                                                    </span>
+                                                    <span class="fin-val cd-note-val">
+                                                        -&#8377;{sale.cdTotal}
+                                                    </span>
+                                                </div>
+                                                <div class="fin-divider"></div>
+                                                <div class="fin-row fin-net">
+                                                    <span class="fin-label fin-bold">Net Receivable</span>
+                                                    <span class="fin-val fin-bold">&#8377;{sale.netReceivable}</span>
+                                                </div>
+                                                <div class="fin-divider"></div>
+                                            </template>
+
+                                            <!-- Cash collected -->
+                                            <div class="fin-row">
+                                                <span class="fin-label">Cash Collected</span>
+                                                <span class="fin-val green">&#8377;{sale.cashCollected}</span>
+                                            </div>
+
+                                            <!-- Balance due -->
+                                            <div class="fin-row fin-total">
+                                                <span class="fin-label">Balance Due</span>
+                                                <span class={sale.balanceClass}>&#8377;{sale.formattedBalance}</span>
+                                            </div>
+
                                         </div>
                                     </template>
                                 </template>

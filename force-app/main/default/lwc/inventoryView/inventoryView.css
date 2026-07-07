@@ -479,3 +479,16 @@
     font-size: 11px;
 }
 .im-val.amber { color: #d97706; font-weight: 700; }
+
+/* CD note in inventory history */
+.cd-note-row { opacity: 0.85; }
+.cd-note-label {
+    font-size: 11px !important;
+    color: #d97706 !important;
+    font-style: italic;
+}
+.cd-note-val {
+    font-size: 11px !important;
+    color: #d97706 !important;
+    font-weight: 600;
+}

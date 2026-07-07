@@ -83,12 +83,41 @@ export default class AccountClientView extends NavigationMixin(LightningElement)
         return rawSales.map(s => {
             const os  = s.Order_Status__c || '';
             const ps  = s.Payment_Status__c || '';
-            const rev = s.Total_Revenue__c || 0;
-            const col = s.Total_Collected__c || 0;
-            // Only Delivered sales have outstanding balance due
-            // Confirmed / Out for Delivery = not yet earned, don't show as due
+
+            // ── Financial breakdown ───────────────────────────────────────
+            // lineTotal = sum of qty × rate (pre-GST)
+            const lineItems = (s.Sale_Line_Items__r || []).map(li => ({
+                ...li,
+                formattedTotal: ((li.Quantity__c || 0) * (li.Rate_Per_Kg__c || 0)).toFixed(2)
+            }));
+            const lineTotal   = lineItems.reduce(
+                (sum, li) => sum + (li.Quantity__c || 0) * (li.Rate_Per_Kg__c || 0), 0
+            );
+
+            // invoiceTotal = Total_Revenue__c (includes GST)
+            const invoiceTotal = s.Total_Revenue__c || 0;
+
+            // gstAmount = difference between invoice and line items
+            const gstAmount = Math.max(0, invoiceTotal - lineTotal);
+            const hasGst    = gstAmount > 0.01;
+            const gstPct    = lineTotal > 0
+                ? ((gstAmount / lineTotal) * 100).toFixed(0) : 0;
+
+            // CD
+            const cdTotal = s.Total_CD_Amount__c || 0;
+            const hasCd   = cdTotal > 0;
+
+            // Net receivable = invoiceTotal - CD
+            const netReceivable = invoiceTotal - cdTotal;
+
+            // Cash collected = Total_Collected__c (sums Settlement_Amount__c)
+            // minus CD since Settlement includes CD to zero the balance
+            const settlementCol = s.Total_Collected__c || 0;
+            const cashCollected = settlementCol - cdTotal;
+
+            // Balance due — only for Delivered sales
             const rawBal = s.Balance_Due__c || 0;
-            const bal = os === 'Delivered' ? rawBal : 0;
+            const bal    = os === 'Delivered' ? rawBal : 0;
 
             let statusClass = 'pay-badge ';
             if (os === 'Cancelled')           statusClass += 'badge-cancelled';
@@ -103,70 +132,74 @@ export default class AccountClientView extends NavigationMixin(LightningElement)
             else if (os === 'Cancelled')         orderStatusClass += 'obadge-cancelled';
             else                                 orderStatusClass += 'obadge-default';
 
-            // Status flow: Confirmed(0) → Out for Delivery(1) → Delivered(2) → Cancelled(3)
-            // Once Delivered or Cancelled — all buttons locked
             const statusOrder = ['Confirmed', 'Out for Delivery', 'Delivered', 'Cancelled'];
             const currentIdx  = statusOrder.indexOf(os);
             const isLocked    = os === 'Delivered' || os === 'Cancelled';
 
-            // Each button: disabled if locked OR if it represents a past/current status
             const btnClass = (btnStatus) => {
-                const btnIdx = statusOrder.indexOf(btnStatus);
+                const btnIdx    = statusOrder.indexOf(btnStatus);
                 const isCurrent = btnStatus === os;
                 const isPast    = btnIdx < currentIdx;
                 const isDisabled = isLocked || isPast || isCurrent;
                 let cls = 'sc-btn ';
-                if (btnStatus === 'Confirmed')         cls += 'sc-confirmed';
+                if (btnStatus === 'Confirmed')             cls += 'sc-confirmed';
                 else if (btnStatus === 'Out for Delivery') cls += 'sc-transit';
-                else if (btnStatus === 'Delivered')    cls += 'sc-delivered';
-                else if (btnStatus === 'Cancelled')    cls += 'sc-cancelled';
+                else if (btnStatus === 'Delivered')        cls += 'sc-delivered';
+                else if (btnStatus === 'Cancelled')        cls += 'sc-cancelled';
                 if (isCurrent) cls += ' sc-active';
                 if (isDisabled) cls += ' sc-disabled';
                 return cls;
             };
 
-            const lineItems = (s.Sale_Line_Items__r || []).map(li => ({
-                ...li,
-                formattedTotal: ((li.Quantity__c || 0) * (li.Rate_Per_Kg__c || 0)).toFixed(2)
-            }));
-
             const payments = (s.Client_Payments__r || []).map(p => ({
                 ...p,
                 formattedAmount: (p.Amount__c || 0).toFixed(2),
                 formattedDate: p.Payment_Date__c
-                    ? new Date(p.Payment_Date__c + 'T00:00:00').toLocaleDateString('en-IN', { day:'2-digit', month:'short' })
+                    ? new Date(p.Payment_Date__c + 'T00:00:00')
+                        .toLocaleDateString('en-IN', { day:'2-digit', month:'short' })
                     : '—'
             }));
 
             const saleDate = s.Sale_Date__c
-                ? new Date(s.Sale_Date__c + 'T00:00:00').toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'2-digit' })
+                ? new Date(s.Sale_Date__c + 'T00:00:00')
+                    .toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'2-digit' })
                 : '—';
 
             return {
                 ...s,
-                Balance_Due__c:    bal,   // overridden to 0 if Cancelled
-                isExpanded:        false,
-                formattedDate:     saleDate,
+                Balance_Due__c:      bal,
+                isExpanded:          false,
+                formattedDate:       saleDate,
                 expectedDeliveryDate: s.Expected_Delivery_Date__c
                     ? new Date(s.Expected_Delivery_Date__c + 'T00:00:00')
                         .toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'2-digit' })
                     : null,
-                formattedRevenue:  rev.toFixed(2),
-                formattedCollected: col.toFixed(2),
-                formattedBalance:  bal.toFixed(2),
+                // Financial breakdown
+                lineTotal:           lineTotal.toFixed(2),
+                gstAmount:           gstAmount.toFixed(2),
+                gstPct,
+                hasGst,
+                invoiceTotal:        invoiceTotal.toFixed(2),
+                hasCd,
+                cdTotal:             cdTotal.toFixed(2),
+                netReceivable:       netReceivable.toFixed(2),
+                cashCollected:       Math.max(0, cashCollected).toFixed(2),
+                formattedRevenue:    netReceivable.toFixed(2),
+                formattedCollected:  Math.max(0, cashCollected).toFixed(2),
+                formattedBalance:    bal.toFixed(2),
                 statusClass,
                 orderStatusClass,
-                balanceClass:      bal > 0 ? 'fin-val red' : 'fin-val green',
-                chevronClass:      'sale-chevron',
+                balanceClass:        bal > 0 ? 'fin-val red' : 'fin-val green',
+                chevronClass:        'sale-chevron',
                 lineItems,
-                hasLineItems:      lineItems.length > 0,
+                hasLineItems:        lineItems.length > 0,
                 payments,
-                hasPayments:       payments.length > 0,
-                isCancelled:       os === 'Cancelled',
-                isNotDelivered:    os !== 'Delivered' && os !== 'Cancelled',
-                statusDisplay:     os === 'Cancelled' ? 'Cancelled' : ps,
-                statusLocked:      isLocked,
-                btnClassConfirmed: btnClass('Confirmed'),
+                hasPayments:         payments.length > 0,
+                isCancelled:         os === 'Cancelled',
+                isNotDelivered:      os !== 'Delivered' && os !== 'Cancelled',
+                statusDisplay:       os === 'Cancelled' ? 'Cancelled' : ps,
+                statusLocked:        isLocked,
+                btnClassConfirmed:   btnClass('Confirmed'),
                 btnClassTransit:   btnClass('Out for Delivery'),
                 btnClassDelivered: btnClass('Delivered'),
                 btnClassCancelled: btnClass('Cancelled')

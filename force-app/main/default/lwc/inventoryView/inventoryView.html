@@ -167,6 +167,16 @@
                                     &#8377;{s.formattedRevenue}
                                 </span>
                             </div>
+                            <template if:true={s.hasCd}>
+                                <div class="dc-row cd-note-row">
+                                    <span class="dc-label cd-note-label">
+                                        &#128281; CD applied
+                                    </span>
+                                    <span class="dc-val cd-note-val">
+                                        -&#8377;{s.cdAmount}
+                                    </span>
+                                </div>
+                            </template>
                         </div>
                     </template>
                 </template>
