@@ -44,6 +44,9 @@ trigger PurchaseTrigger on Purchase__c (
                 FROM Purchase__c WHERE Id IN :statusChanged
             ];
             EmailNotificationHelper.sendPurchaseStatusChanged(full);
+
+            // Push notification for purchase status change
+            NotificationHelper.notifyPurchaseStatusChanged(full);
         }
     }
 }

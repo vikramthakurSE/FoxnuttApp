@@ -103,6 +103,29 @@ public class SaleLineItemHelper {
 
         // Send new sale email
         EmailNotificationHelper.sendNewSaleAlert(newItems);
+
+        // Push notification with full line item details
+        // Re-query sale with client + delivery date for notification body
+        List<Sale__c> salesForNotif = [
+            SELECT Id, Name, Order_Status__c,
+                   Expected_Delivery_Date__c,
+                   Client__r.Name
+            FROM Sale__c
+            WHERE Id IN :saleIds
+        ];
+
+        // Build lineItems map per sale
+        Map<Id, List<Sale_Line_Item__c>> liMap =
+            new Map<Id, List<Sale_Line_Item__c>>();
+        for (Sale_Line_Item__c li : newItems) {
+            if (!liMap.containsKey(li.Sale__c))
+                liMap.put(li.Sale__c, new List<Sale_Line_Item__c>());
+            liMap.get(li.Sale__c).add(li);
+        }
+
+        if (!salesForNotif.isEmpty()) {
+            NotificationHelper.notifyNewSale(salesForNotif, liMap);
+        }
     }
 
     // ════════════════════════════════════════════════════════════════════════
