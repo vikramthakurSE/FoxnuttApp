@@ -137,6 +137,14 @@ public with sharing class QuickPurchaseController {
         ];
         if (!lineItems.isEmpty()) {
             EmailNotificationHelper.sendNewPurchaseAlert(lineItems);
+
+            // Push notification with brand/cost details
+            Map<Id, Purchase__c> purchaseMap = new Map<Id, Purchase__c>([
+                SELECT Id, Name, Supplier__r.Name,
+                       Total_Order_Cost__c, Tax_Amount__c
+                FROM Purchase__c WHERE Id = :purchaseId
+            ]);
+            NotificationHelper.notifyNewPurchase(lineItems, purchaseMap);
         }
     }
 }

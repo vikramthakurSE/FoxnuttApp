@@ -1,20 +1,11 @@
 trigger SaleTrigger on Sale__c (after insert, after update) {
 
-    // ── AFTER INSERT: new sale created → push notification ────────────────
-    // Email already sent via SaleLineItemHelper.onInsert (line items needed)
-    if (Trigger.isAfter && Trigger.isInsert) {
-        List<Sale__c> withClient = [
-            SELECT Id, Name, Order_Status__c,
-                   Total_Revenue__c, Client__r.Name
-            FROM Sale__c
-            WHERE Id IN :Trigger.newMap.keySet()
-        ];
-        if (!withClient.isEmpty()) {
-            NotificationHelper.notifyNewSale(withClient);
-        }
-    }
+    // NOTE: New sale push notification is fired from SaleLineItemHelper.onInsert
+    // so it has access to line items (brand, qty, rate, total)
+    // The after insert here only handled the notification which was wrong
+    // because Total_Revenue__c = 0 at insert time (line items not yet saved)
 
-    // ── AFTER UPDATE: status changes ───────────────────────────────────────
+    // ── AFTER UPDATE: status changes ──────────────────────────────────────
     if (Trigger.isAfter && Trigger.isUpdate) {
 
         Set<Id> deliveredNow     = new Set<Id>();

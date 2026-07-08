@@ -1,10 +1,12 @@
 public class NotificationHelper {
 
-    // ── Custom Notification Type IDs (from Notification Builder) ──────────
-    private static final Id TYPE_NEW_SALE      = '0MLdL000002m2ZRWAY';
-    private static final Id TYPE_STATUS_CHANGED = '0MLdL000002m2b3WAA';
-    private static final Id TYPE_PAYMENT        = '0MLdL000002m2cfWAA';
-    private static final Id TYPE_DELIVERY       = '0MLdL000002m2eHWAQ';
+    // ── Custom Notification Type IDs ──────────────────────────────────────
+    private static final Id TYPE_NEW_SALE        = '0MLdL000002m2ZRWAY';
+    private static final Id TYPE_STATUS_CHANGED  = '0MLdL000002m2b3WAA';
+    private static final Id TYPE_PAYMENT         = '0MLdL000002m2cfWAA';
+    private static final Id TYPE_DELIVERY        = '0MLdL000002m2eHWAQ';
+    private static final Id TYPE_NEW_PURCHASE    = '0MLdL000002oTSHWA2';
+    private static final Id TYPE_MFR_PAYMENT     = '0MLdL000002oTTtWAM';
 
     // ── Get all active standard users (same recipients as email) ──────────
     private static Set<String> getRecipientIds() {
@@ -46,22 +48,63 @@ public class NotificationHelper {
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // 1. NEW SALE CREATED
+    // 1. NEW SALE CREATED — called from SaleLineItemHelper after line items saved
     // ════════════════════════════════════════════════════════════════════════
-    public static void notifyNewSale(List<Sale__c> sales) {
+    public static void notifyNewSale(
+        List<Sale__c> sales,
+        Map<Id, List<Sale_Line_Item__c>> lineItemsMap
+    ) {
+        Set<String> recipientIds = getRecipientIds();
+        if (recipientIds.isEmpty()) return;
+
+        List<OrgWideEmailAddress> owas = [
+            SELECT Id FROM OrgWideEmailAddress LIMIT 1
+        ];
+
         for (Sale__c s : sales) {
             String clientName = s.Client__r != null
                 ? s.Client__r.Name : 'Client';
-            Decimal rev = s.Total_Revenue__c != null
-                ? s.Total_Revenue__c : 0;
 
-            send(
-                TYPE_NEW_SALE,
-                '🛒 New Sale — ' + s.Name,
-                clientName + ' · ₹' + rev.setScale(0) + ' · ' +
-                (s.Order_Status__c != null ? s.Order_Status__c : 'Confirmed'),
-                s.Id
-            );
+            // Build brand summary from line items
+            List<Sale_Line_Item__c> items = lineItemsMap.containsKey(s.Id)
+                ? lineItemsMap.get(s.Id)
+                : new List<Sale_Line_Item__c>();
+
+            Decimal totalRevenue = 0;
+            String brandSummary  = '';
+            for (Sale_Line_Item__c li : items) {
+                Decimal qty  = li.Quantity__c != null ? li.Quantity__c : 0;
+                Decimal rate = li.Rate_Per_Kg__c != null ? li.Rate_Per_Kg__c : 0;
+                Decimal lineAmt = qty * rate;
+                totalRevenue += lineAmt;
+                if (brandSummary != '') brandSummary += ', ';
+                brandSummary += li.Brand__c + ' ' +
+                    qty.setScale(0) + 'KG @₹' + rate.setScale(0);
+            }
+
+            // Body: client · brands · amount · delivery date
+            String deliveryInfo = s.Expected_Delivery_Date__c != null
+                ? ' · Deliver: ' + s.Expected_Delivery_Date__c.format()
+                : '';
+
+            String body = clientName +
+                ' · ' + brandSummary +
+                ' · ₹' + totalRevenue.setScale(0).format() +
+                deliveryInfo;
+
+            Messaging.CustomNotification notif =
+                new Messaging.CustomNotification();
+            notif.setTitle('🛒 New Sale — ' + s.Name);
+            notif.setBody(body.length() > 200
+                ? body.substring(0, 197) + '...' : body);
+            notif.setNotificationTypeId(TYPE_NEW_SALE);
+            notif.setTargetId(s.Id);
+
+            try {
+                notif.send(recipientIds);
+            } catch (Exception e) {
+                System.debug('New sale notification failed: ' + e.getMessage());
+            }
         }
     }
 
@@ -146,5 +189,141 @@ public class NotificationHelper {
             ' · Tap to view orders',
             null
         );
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // 5. NEW PURCHASE CREATED
+    // ════════════════════════════════════════════════════════════════════════
+    public static void notifyNewPurchase(
+        List<Purchase_Line_Item__c> lineItems,
+        Map<Id, Purchase__c> purchaseMap
+    ) {
+        Set<String> recipientIds = getRecipientIds();
+        if (recipientIds.isEmpty()) return;
+
+        Map<Id, List<Purchase_Line_Item__c>> liMap =
+            new Map<Id, List<Purchase_Line_Item__c>>();
+        for (Purchase_Line_Item__c li : lineItems) {
+            if (!liMap.containsKey(li.Purchase__c))
+                liMap.put(li.Purchase__c,
+                    new List<Purchase_Line_Item__c>());
+            liMap.get(li.Purchase__c).add(li);
+        }
+
+        for (Id purId : liMap.keySet()) {
+            Purchase__c p = purchaseMap.get(purId);
+            if (p == null) continue;
+
+            List<Purchase_Line_Item__c> items = liMap.get(purId);
+            Decimal totalCost   = 0;
+            String brandSummary = '';
+            for (Purchase_Line_Item__c li : items) {
+                Decimal qty  = li.Quantity__c != null ? li.Quantity__c : 0;
+                Decimal cost = li.Landing_Cost_Per_Kg__c != null
+                               ? li.Landing_Cost_Per_Kg__c : 0;
+                totalCost += qty * cost;
+                if (brandSummary != '') brandSummary += ', ';
+                brandSummary += li.Brand__c + ' ' +
+                    qty.setScale(0) + 'KG @Rs' + cost.setScale(0);
+            }
+
+            String supplier = p.Supplier__r != null
+                ? p.Supplier__r.Name : 'Supplier';
+
+            Messaging.CustomNotification notif =
+                new Messaging.CustomNotification();
+            notif.setTitle('📦 New Purchase — ' + p.Name);
+            String body = supplier + ' · ' + brandSummary +
+                ' · Rs ' + totalCost.setScale(0).format();
+            notif.setBody(body.length() > 200
+                ? body.substring(0, 197) + '...' : body);
+            notif.setNotificationTypeId(TYPE_NEW_PURCHASE);
+            notif.setTargetId(purId);
+            try { notif.send(recipientIds); }
+            catch (Exception e) {
+                System.debug('New purchase notif failed: ' + e.getMessage());
+            }
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // 6. PURCHASE STATUS CHANGED
+    // ════════════════════════════════════════════════════════════════════════
+    public static void notifyPurchaseStatusChanged(
+        List<Purchase__c> purchases
+    ) {
+        Set<String> recipientIds = getRecipientIds();
+        if (recipientIds.isEmpty()) return;
+
+        for (Purchase__c p : purchases) {
+            String status   = p.Delivery_Status__c;
+            String emoji    = status == 'Received'         ? '✅'
+                            : status == 'Out for Delivery' ? '🚚'
+                            : status == 'Confirmed'        ? '📋'
+                            : '📦';
+            String supplier = p.Supplier__r != null
+                ? p.Supplier__r.Name : 'Supplier';
+            Decimal cost    = p.Total_Order_Cost__c != null
+                ? p.Total_Order_Cost__c : 0;
+            Decimal tax     = p.Tax_Amount__c != null
+                ? p.Tax_Amount__c : 0;
+
+            String body = supplier +
+                ' · Rs ' + cost.setScale(0).format() +
+                (tax > 0 ? ' + Rs ' + tax.setScale(0) + ' tax' : '') +
+                ' · ' + status;
+
+            Messaging.CustomNotification notif =
+                new Messaging.CustomNotification();
+            notif.setTitle(emoji + ' ' + p.Name + ' — ' + status);
+            notif.setBody(body);
+            notif.setNotificationTypeId(TYPE_NEW_PURCHASE);
+            notif.setTargetId(p.Id);
+            try { notif.send(recipientIds); }
+            catch (Exception e) {
+                System.debug('Purchase status notif failed: ' + e.getMessage());
+            }
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // 7. MANUFACTURER PAYMENT
+    // ════════════════════════════════════════════════════════════════════════
+    public static void notifyMfrPayment(
+        List<Manufacturer_Payment__c> payments
+    ) {
+        Set<String> recipientIds = getRecipientIds();
+        if (recipientIds.isEmpty()) return;
+
+        Set<Id> purchaseIds = new Set<Id>();
+        for (Manufacturer_Payment__c mp : payments) {
+            if (mp.Purchase__c != null) purchaseIds.add(mp.Purchase__c);
+        }
+        Map<Id, Purchase__c> purchaseMap = new Map<Id, Purchase__c>([
+            SELECT Id, Name, Supplier__r.Name
+            FROM Purchase__c WHERE Id IN :purchaseIds
+        ]);
+
+        for (Manufacturer_Payment__c mp : payments) {
+            Decimal amt     = mp.Amount_Paid__c != null ? mp.Amount_Paid__c : 0;
+            Purchase__c p   = purchaseMap.get(mp.Purchase__c);
+            String purName  = p != null ? p.Name : '';
+            String supplier = (p != null && p.Supplier__r != null)
+                ? p.Supplier__r.Name : 'Supplier';
+            String paidBy   = mp.Paid_By__c != null ? mp.Paid_By__c : '-';
+
+            Messaging.CustomNotification notif =
+                new Messaging.CustomNotification();
+            notif.setTitle('💸 Mfr Payment — Rs ' +
+                amt.setScale(0).format());
+            notif.setBody('To ' + supplier + ' · ' +
+                purName + ' · Paid by ' + paidBy);
+            notif.setNotificationTypeId(TYPE_MFR_PAYMENT);
+            if (mp.Purchase__c != null) notif.setTargetId(mp.Purchase__c);
+            try { notif.send(recipientIds); }
+            catch (Exception e) {
+                System.debug('Mfr payment notif failed: ' + e.getMessage());
+            }
+        }
     }
 }
