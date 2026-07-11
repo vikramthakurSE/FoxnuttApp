@@ -68,4 +68,54 @@ public with sharing class AccountClientController {
             Order_Status__c  = status
         );
     }
+
+    @AuraEnabled(cacheable=false)
+    public static Map<String, Object> getFollowUpStatus(Id accountId) {
+        Account a = [
+            SELECT Id, Follow_Up__c,
+                   Follow_Up_Date__c,
+                   Follow_Up_Notes__c,
+                   Follow_Up_History__c
+            FROM Account WHERE Id = :accountId LIMIT 1
+        ];
+        return new Map<String, Object>{
+            'followUp'      => a.Follow_Up__c,
+            'followUpDate'  => a.Follow_Up_Date__c != null
+                               ? String.valueOf(a.Follow_Up_Date__c) : null,
+            'followUpNotes' => a.Follow_Up_Notes__c,
+            'followUpHistory' => a.Follow_Up_History__c
+        };
+    }
+
+    @AuraEnabled
+    public static void saveFollowUp(
+        Id accountId,
+        Boolean followUp,
+        String notes
+    ) {
+        Account a = [
+            SELECT Id, Follow_Up__c, Follow_Up_History__c
+            FROM Account WHERE Id = :accountId LIMIT 1
+        ];
+
+        // Append new entry to history log
+        String today   = Date.today().format();
+        String action  = followUp ? 'Followed Up' : 'Cleared';
+        String newEntry = '[' + today + '] ' + action;
+        if (String.isNotBlank(notes)) {
+            newEntry += ': ' + notes;
+        }
+
+        String existing = a.Follow_Up_History__c;
+        a.Follow_Up_History__c = String.isBlank(existing)
+            ? newEntry
+            : newEntry + '\n' + existing; // newest first
+
+        a.Follow_Up__c       = followUp;
+        a.Follow_Up_Date__c  = followUp ? Date.today() : null;
+        a.Follow_Up_Notes__c = notes; // current notes (for next pre-fill)
+
+        update a;
+    }
+
 }

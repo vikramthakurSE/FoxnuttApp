@@ -293,6 +293,51 @@
             </template>
         </div>
 
+        <!-- FOLLOW UP SECTION -->
+        <div class="followup-section">
+            <div class="followup-header">
+                <div class="followup-title">&#128222; Follow Up</div>
+                <template if:true={followUpDate}>
+                    <div class="followup-date">
+                        Marked on {followUpDate}
+                    </div>
+                </template>
+            </div>
+
+            <!-- Notes input -->
+            <textarea class="followup-notes"
+                placeholder="Add notes from client conversation..."
+                value={followUpNotes}
+                onchange={onFollowUpNotes}
+                rows="3">
+            </textarea>
+
+            <!-- Toggle button -->
+            <button class={followUpBtnClass}
+                onclick={saveFollowUpHandler}
+                disabled={isFollowUpSaving}>
+                {followUpBtnLabel}
+            </button>
+
+            <template if:true={followUp}>
+                <div class="followup-status">
+                    &#10003; Follow up marked — daily reminders paused for 1 week
+                </div>
+            </template>
+
+            <!-- History log -->
+            <template if:true={hasFollowUpHistory}>
+                <div class="followup-history-label">HISTORY</div>
+                <div class="followup-history">
+                    <template for:each={followUpHistoryLines} for:item="line">
+                        <div key={line.key} class="followup-history-row">
+                            {line.text}
+                        </div>
+                    </template>
+                </div>
+            </template>
+        </div>
+
         <!-- NEW SALE BUTTON -->
         <div class="new-sale-wrap">
             <button class="new-sale-btn" onclick={openSaleModal}>

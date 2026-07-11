@@ -817,21 +817,46 @@ public class QuarterlyReportHelper {
         String subject, String html, List<String> toAddresses
     ) {
         if (toAddresses == null || toAddresses.isEmpty()) return;
+
         List<OrgWideEmailAddress> owas = [
             SELECT Id FROM OrgWideEmailAddress LIMIT 1
         ];
-        Messaging.SingleEmailMessage mail =
-            new Messaging.SingleEmailMessage();
-        mail.setToAddresses(toAddresses);
-        mail.setSubject(subject);
-        mail.setHtmlBody(html);
-        mail.setSaveAsActivity(false);
-        if (!owas.isEmpty())
-            mail.setOrgWideEmailAddressId(owas[0].Id);
+
+        List<Messaging.SingleEmailMessage> mails =
+            new List<Messaging.SingleEmailMessage>();
+        List<String> sentAddresses = new List<String>();
+
+        for (String addr : toAddresses) {
+            if (String.isBlank(addr)) continue;
+
+            Messaging.SingleEmailMessage mail =
+                new Messaging.SingleEmailMessage();
+            mail.setToAddresses(new List<String>{ addr });
+            mail.setSubject(subject);
+            mail.setHtmlBody(html);
+            mail.setSaveAsActivity(false);
+            if (!owas.isEmpty()) {
+                mail.setOrgWideEmailAddressId(owas[0].Id);
+            }
+            mails.add(mail);
+            sentAddresses.add(addr);
+        }
+
+        if (mails.isEmpty()) return;
+
         try {
-            Messaging.sendEmail(
-                new List<Messaging.SingleEmailMessage>{ mail }
-            );
+            Messaging.SendEmailResult[] results =
+                Messaging.sendEmail(mails, false);
+            for (Integer i = 0; i < results.size(); i++) {
+                if (results[i].isSuccess()) continue;
+
+                for (Messaging.SendEmailError err : results[i].getErrors()) {
+                    System.debug(
+                        'Quarterly email failed for ' + sentAddresses[i] +
+                        ': ' + err.getStatusCode() + ' - ' + err.getMessage()
+                    );
+                }
+            }
         } catch (Exception e) {
             System.debug('Quarterly email failed: ' + e.getMessage());
         }
