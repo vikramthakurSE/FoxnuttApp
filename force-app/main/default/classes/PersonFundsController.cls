@@ -6,9 +6,8 @@ public with sharing class PersonFundsController {
         List<Person_Fund__c> funds = [
             SELECT Id, Name, Total_Collected__c,
                    Total_Mfr_Paid__c, Total_Expenses__c,
-                   Total_Withdrawn__c, Available_Funds__c,
-                   Last_Updated__c, Opening_Balance_Date__c,
-                   Adjustment_Log__c
+                   Available_Funds__c, Last_Updated__c,
+                   Opening_Balance_Date__c, Adjustment_Log__c
             FROM Person_Fund__c
             ORDER BY Available_Funds__c DESC NULLS LAST
         ];
@@ -171,7 +170,7 @@ public with sharing class PersonFundsController {
             Expense_Type__c = expenseType,
             Spent_By__c     = spentBy,
             Notes_Remarks__c  = String.isBlank(description)
-                              ? null : description
+                              ? null : description  
         );
     }
 
@@ -200,139 +199,61 @@ public with sharing class PersonFundsController {
     public static void adjustBalance(
         String personName,
         Decimal amount,
-        String adjustmentType, // 'Addition' or 'Subtraction'
-        String reason,         // one of the 4 options above
-        String notes
+        String adjustmentType,
+        String reason
     ) {
         if (amount == null || amount <= 0) {
             throw new AuraHandledException('Amount must be greater than 0.');
         }
 
-        // Validate: cannot transfer to yourself
-        if ((reason == 'Transferred to Vikram' && personName == 'Vikram') ||
-            (reason == 'Transferred to Rohan'  && personName == 'Rohan')) {
-            throw new AuraHandledException(
-                'Cannot transfer to yourself.'
-            );
-        }
-
-        // Load all person funds at once
-        Map<String, Person_Fund__c> fundMap = new Map<String, Person_Fund__c>();
-        for (Person_Fund__c pf : [
+        List<Person_Fund__c> funds = [
             SELECT Id, Name, Total_Collected__c,
-                   Total_Withdrawn__c, Adjustment_Log__c,
-                   Last_Updated__c
+                   Last_Updated__c, Adjustment_Log__c
             FROM Person_Fund__c
-            WHERE Name IN ('Vikram', 'Rohan')
-        ]) {
-            fundMap.put(pf.Name, pf);
-        }
+            WHERE Name = :personName
+            LIMIT 1
+        ];
 
-        Person_Fund__c fromPf = fundMap.get(personName);
-        if (fromPf == null) {
+        if (funds.isEmpty()) {
             throw new AuraHandledException(
-                'Person Fund not found for: ' + personName
+                'Person Fund record not found for: ' + personName
             );
         }
 
-        String today = String.valueOf(Date.today()).left(10);
-        String logNote = String.isBlank(notes) ? reason : reason + ': ' + notes;
+        Person_Fund__c pf = funds[0];
 
-        if (reason == 'Profit Withdrawal') {
-            // Deduct from collected, add to withdrawn
-            Decimal collected = fromPf.Total_Collected__c != null
-                                ? fromPf.Total_Collected__c : 0;
-            Decimal withdrawn = fromPf.Total_Withdrawn__c != null
-                                ? fromPf.Total_Withdrawn__c : 0;
+        // Step 1: Write the log entry FIRST in its own DML
+        // This ensures it persists even if a trigger fires
+        // on the balance update below
+        String today    = String.valueOf(Date.today()).left(10);
+        String newEntry = '{"date":"' + today +
+                          '","amount":' + amount.setScale(2) +
+                          ',"type":"' + adjustmentType +
+                          '","reason":"' + reason.replaceAll('"', '\'') +
+                          '"}';
 
-            String entry = '{"date":"' + today + '","amount":' + amount.setScale(2) +
-                           ',"type":"Subtraction","reason":"' +
-                           logNote.replaceAll('"', '\'') + '"}';
-            String log = String.isBlank(fromPf.Adjustment_Log__c)
-                         ? '[' + entry + ']'
-                         : fromPf.Adjustment_Log__c.removeEnd(']') + ',' + entry + ']';
+        String existing = pf.Adjustment_Log__c;
+        String newLog   = String.isBlank(existing)
+                          ? '[' + newEntry + ']'
+                          : existing.removeEnd(']') + ',' + newEntry + ']';
 
-            update new Person_Fund__c(
-                Id = fromPf.Id,
-                Adjustment_Log__c  = log
-            );
-            update new Person_Fund__c(
-                Id                 = fromPf.Id,
-                Total_Collected__c = Math.max(0, collected - amount),
-                Total_Withdrawn__c = withdrawn + amount,
-                Last_Updated__c    = Date.today()
-            );
+        update new Person_Fund__c(
+            Id                 = pf.Id,
+            Adjustment_Log__c  = newLog
+        );
 
-        } else if (reason == 'Transferred to Vikram' ||
-                   reason == 'Transferred to Rohan') {
+        // Step 2: Update balance separately
+        Decimal current = pf.Total_Collected__c != null
+                          ? pf.Total_Collected__c : 0;
+        Decimal updated = adjustmentType == 'Addition'
+                          ? current + amount
+                          : current - amount;
 
-            String toName = reason == 'Transferred to Vikram' ? 'Vikram' : 'Rohan';
-            Person_Fund__c toPf = fundMap.get(toName);
-            if (toPf == null) {
-                throw new AuraHandledException(
-                    'Person Fund not found for: ' + toName
-                );
-            }
-
-            Decimal fromCollected = fromPf.Total_Collected__c != null
-                                    ? fromPf.Total_Collected__c : 0;
-            Decimal toCollected   = toPf.Total_Collected__c   != null
-                                    ? toPf.Total_Collected__c   : 0;
-
-            // Log on FROM person (deduction)
-            String fromEntry = '{"date":"' + today + '","amount":' + amount.setScale(2) +
-                               ',"type":"Subtraction","reason":"Transferred to ' +
-                               toName + (String.isBlank(notes) ? '' : ': ' + notes) + '"}';
-            String fromLog = String.isBlank(fromPf.Adjustment_Log__c)
-                             ? '[' + fromEntry + ']'
-                             : fromPf.Adjustment_Log__c.removeEnd(']') + ',' + fromEntry + ']';
-
-            // Log on TO person (addition)
-            String toEntry = '{"date":"' + today + '","amount":' + amount.setScale(2) +
-                             ',"type":"Addition","reason":"Transferred from ' +
-                             personName + (String.isBlank(notes) ? '' : ': ' + notes) + '"}';
-            String toLog = String.isBlank(toPf.Adjustment_Log__c)
-                           ? '[' + toEntry + ']'
-                           : toPf.Adjustment_Log__c.removeEnd(']') + ',' + toEntry + ']';
-
-            // Write logs first
-            update new Person_Fund__c(Id = fromPf.Id, Adjustment_Log__c = fromLog);
-            update new Person_Fund__c(Id = toPf.Id,   Adjustment_Log__c = toLog);
-
-            // Update balances
-            update new Person_Fund__c(
-                Id = fromPf.Id,
-                Total_Collected__c = Math.max(0, fromCollected - amount),
-                Last_Updated__c    = Date.today()
-            );
-            update new Person_Fund__c(
-                Id = toPf.Id,
-                Total_Collected__c = toCollected + amount,
-                Last_Updated__c    = Date.today()
-            );
-
-        } else {
-            // Balance Adjustment — add or subtract
-            Decimal current = fromPf.Total_Collected__c != null
-                              ? fromPf.Total_Collected__c : 0;
-            Decimal updated = adjustmentType == 'Addition'
-                              ? current + amount
-                              : Math.max(0, current - amount);
-
-            String entry = '{"date":"' + today + '","amount":' + amount.setScale(2) +
-                           ',"type":"' + adjustmentType + '","reason":"' +
-                           logNote.replaceAll('"', '\'') + '"}';
-            String log = String.isBlank(fromPf.Adjustment_Log__c)
-                         ? '[' + entry + ']'
-                         : fromPf.Adjustment_Log__c.removeEnd(']') + ',' + entry + ']';
-
-            update new Person_Fund__c(Id = fromPf.Id, Adjustment_Log__c = log);
-            update new Person_Fund__c(
-                Id                 = fromPf.Id,
-                Total_Collected__c = updated,
-                Last_Updated__c    = Date.today()
-            );
-        }
+        update new Person_Fund__c(
+            Id                 = pf.Id,
+            Total_Collected__c = updated,
+            Last_Updated__c    = Date.today()
+        );
     }
 
     // ── Get available quarters ────────────────────────────────────────────

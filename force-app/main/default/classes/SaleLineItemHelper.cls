@@ -109,7 +109,8 @@ public class SaleLineItemHelper {
         List<Sale__c> salesForNotif = [
             SELECT Id, Name, Order_Status__c,
                    Expected_Delivery_Date__c,
-                   Client__r.Name
+                   Client__r.Name,
+                   Client__r.Phone
             FROM Sale__c
             WHERE Id IN :saleIds
         ];
@@ -125,6 +126,9 @@ public class SaleLineItemHelper {
 
         if (!salesForNotif.isEmpty()) {
             NotificationHelper.notifyNewSale(salesForNotif, liMap);
+            // WhatsApp order confirmation to client
+            // WhatsApp order confirmation to client
+            WhatsAppHelper.dispatchOrderConfirmed(salesForNotif, liMap);
         }
     }
 
