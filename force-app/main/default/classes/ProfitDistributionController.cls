@@ -9,21 +9,26 @@ public class ProfitDistributionController {
     public static List<String> getAvailableQuarters() {
         Set<String> quarters = new Set<String>();
 
+        // Use Sale_Date__c (not Quarter__c formula) to compute quarters
         for (AggregateResult ar : [
-            SELECT Quarter__c q FROM Sale__c
-            WHERE Quarter__c != null
-            GROUP BY Quarter__c
-            ORDER BY Quarter__c DESC
+            SELECT CALENDAR_YEAR(Sale_Date__c) yr,
+                   CALENDAR_MONTH(Sale_Date__c) mo
+            FROM Sale__c
+            WHERE Sale_Date__c != null
+            GROUP BY CALENDAR_YEAR(Sale_Date__c),
+                     CALENDAR_MONTH(Sale_Date__c)
         ]) {
-            quarters.add((String) ar.get('q'));
+            Integer yr = (Integer) ar.get('yr');
+            Integer mo = (Integer) ar.get('mo');
+            Integer q  = (Integer) Math.ceil(mo / 3.0);
+            quarters.add('Qtr' + q + '_' + yr);
         }
 
-        // Add current quarter in case no sales yet
+        // Add current quarter
         quarters.add(currentQuarter());
 
         List<String> sorted = new List<String>(quarters);
         sorted.sort();
-        // Reverse for newest first
         List<String> result = new List<String>();
         for (Integer i = sorted.size() - 1; i >= 0; i--) {
             result.add(sorted[i]);

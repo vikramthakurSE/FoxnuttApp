@@ -1,201 +1,8 @@
 <template>
 <div class="page">
 
-    <!-- PROFIT DISTRIBUTION MODAL -->
-    <template if:true={isDistOpen}>
-        <div class="modal-backdrop" onclick={closeDistribution}></div>
-        <div class="modal-sheet dist-sheet">
-            <div class="modal-handle"></div>
-            <div class="modal-header dist-header">
-                <div class="modal-title-wrap">
-                    <div class="modal-title">&#128184; Profit Distribution</div>
-                    <div class="modal-sub">
-                        Vikram 45% · Rohan 45% · Company 10%
-                    </div>
-                </div>
-                <button class="modal-close"
-                    onclick={closeDistribution}>&#10005;</button>
-            </div>
-            <div class="modal-body">
 
-                <!-- Quarter Selector -->
-                <div class="form-group">
-                    <label class="form-label">Quarter *</label>
-                    <select class="form-input"
-                        onchange={onDistQuarter}>
-                        <option value="">-- Select Quarter --</option>
-                        <template for:each={availableQuarters}
-                            for:item="q">
-                            <option key={q} value={q}>{q}</option>
-                        </template>
-                    </select>
-                </div>
-
-                <!-- Profit Breakdown — shown after quarter selected -->
-                <template if:true={distData}>
-                    <!-- Already distributed warning -->
-                    <template if:true={distData.alreadyDistributed}>
-                        <div class="dist-already">
-                            &#9888; Profit already distributed for
-                            {distData.quarter}. Details shown below.
-                        </div>
-                    </template>
-
-                    <!-- Profit Summary Card -->
-                    <div class="dist-summary">
-                        <div class="ds-title">CALCULATED PROFIT</div>
-                        <div class="ds-row">
-                            <span class="ds-label">Revenue (Delivered)</span>
-                            <span class="ds-val green">
-                                &#8377;{distData.revenueFormatted}
-                            </span>
-                        </div>
-                        <div class="ds-row">
-                            <span class="ds-label">− Gross Margin</span>
-                            <span class="ds-val green">
-                                &#8377;{distData.grossMarginFormatted}
-                            </span>
-                        </div>
-                        <div class="ds-row">
-                            <span class="ds-label">
-                                − Expenses
-                            </span>
-                            <span class="ds-val red">
-                                &#8377;{distData.expensesFormatted}
-                            </span>
-                        </div>
-                        <div class="ds-divider"></div>
-                        <div class="ds-row ds-net">
-                            <span class="ds-label">Net Profit</span>
-                            <span class="ds-val amber">
-                                &#8377;{distData.netProfitFormatted}
-                            </span>
-                        </div>
-                    </div>
-
-                    <!-- Adjusted Profit Input -->
-                    <template if:false={distData.alreadyDistributed}>
-                        <div class="form-group">
-                            <label class="form-label">
-                                Adjusted Profit (&#8377;) *
-                            </label>
-                            <input type="number" class="form-input"
-                                value={distAdjusted}
-                                placeholder="Enter confirmed profit"
-                                onchange={onDistAdjusted}>
-                            <div class="form-hint">
-                                Pre-filled from calculation.
-                                Change only if you want to adjust.
-                            </div>
-                        </div>
-
-                        <!-- Split Preview -->
-                        <div class="split-preview">
-                            <div class="sp-title">DISTRIBUTION PREVIEW</div>
-                            <div class="sp-row">
-                                <div class="sp-person">
-                                    <div class="sp-avatar sp-v">V</div>
-                                    <div>
-                                        <div class="sp-name">Vikram</div>
-                                        <div class="sp-pct">45%</div>
-                                    </div>
-                                </div>
-                                <div class="sp-amount">
-                                    &#8377;{distVikramAmt}
-                                </div>
-                            </div>
-                            <div class="sp-row">
-                                <div class="sp-person">
-                                    <div class="sp-avatar sp-r">R</div>
-                                    <div>
-                                        <div class="sp-name">Rohan</div>
-                                        <div class="sp-pct">45%</div>
-                                    </div>
-                                </div>
-                                <div class="sp-amount">
-                                    &#8377;{distRohanAmt}
-                                </div>
-                            </div>
-                            <div class="sp-row sp-company">
-                                <div class="sp-person">
-                                    <div class="sp-avatar sp-c">&#127970;</div>
-                                    <div>
-                                        <div class="sp-name">
-                                            Company Reserve
-                                        </div>
-                                        <div class="sp-pct">10%</div>
-                                    </div>
-                                </div>
-                                <div class="sp-amount">
-                                    &#8377;{distCompanyAmt}
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Date + Notes -->
-                        <div class="form-row-2">
-                            <div class="form-group">
-                                <label class="form-label">
-                                    Withdrawal Date *
-                                </label>
-                                <input type="date" class="form-input"
-                                    value={distDate}
-                                    onchange={onDistDate}>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Notes</label>
-                                <input type="text" class="form-input"
-                                    placeholder="Optional note..."
-                                    value={distNotes}
-                                    onchange={onDistNotes}>
-                            </div>
-                        </div>
-
-                        <button class="dist-confirm-btn"
-                            onclick={confirmDistribution}
-                            disabled={isDistSaving}>
-                            <template if:false={isDistSaving}>
-                                &#10003; Confirm &amp; Withdraw
-                            </template>
-                            <template if:true={isDistSaving}>
-                                Processing...
-                            </template>
-                        </button>
-                    </template>
-
-                    <!-- Already distributed — read only -->
-                    <template if:true={distData.alreadyDistributed}>
-                        <div class="split-preview">
-                            <div class="sp-title">DISTRIBUTED</div>
-                            <div class="sp-row">
-                                <span class="ds-label">Vikram</span>
-                                <span class="ds-val">
-                                    &#8377;{distData.existingVikramFmt}
-                                </span>
-                            </div>
-                            <div class="sp-row">
-                                <span class="ds-label">Rohan</span>
-                                <span class="ds-val">
-                                    &#8377;{distData.existingRohanFmt}
-                                </span>
-                            </div>
-                            <div class="sp-row">
-                                <span class="ds-label">
-                                    Company Reserve
-                                </span>
-                                <span class="ds-val">
-                                    &#8377;{distData.existingCompanyFmt}
-                                </span>
-                            </div>
-                        </div>
-                    </template>
-                </template>
-
-            </div>
-        </div>
-    </template>
-
-    <!-- ADJUST BALANCE MODAL -->
+        <!-- ADJUST BALANCE MODAL -->
     <template if:true={isAdjOpen}>
         <div class="modal-backdrop" onclick={closeAdjust}></div>
         <div class="modal-sheet">
@@ -212,7 +19,7 @@
             </div>
             <div class="modal-body">
 
-                <!-- Person selector -->
+                <!-- Person -->
                 <div class="form-group">
                     <label class="form-label">Person *</label>
                     <select class="form-input" onchange={onAdjPerson}>
@@ -222,24 +29,40 @@
                     </select>
                 </div>
 
-                <!-- Addition / Subtraction toggle -->
+                <!-- Reason -->
                 <div class="form-group">
-                    <label class="form-label">Type *</label>
-                    <div class="adj-toggle">
-                        <button
-                            class={addBtnClass}
-                            data-val="Addition"
-                            onclick={onAdjType}>
-                            + Addition
-                        </button>
-                        <button
-                            class={subBtnClass}
-                            data-val="Subtraction"
-                            onclick={onAdjType}>
-                            − Subtraction
-                        </button>
-                    </div>
+                    <label class="form-label">Reason *</label>
+                    <select class="form-input" onchange={onAdjReason}>
+                        <option value="">-- Select Reason --</option>
+                        <option value="Transferred to Vikram">
+                            Transferred to Vikram
+                        </option>
+                        <option value="Transferred to Rohan">
+                            Transferred to Rohan
+                        </option>
+                        <option value="Profit Withdrawal">
+                            Profit Withdrawal
+                        </option>
+                        <option value="Balance Adjustment">
+                            Balance Adjustment
+                        </option>
+                    </select>
                 </div>
+
+                <!-- Add/Subtract toggle — only for Balance Adjustment -->
+                <template if:true={showTypeToggle}>
+                    <div class="form-group">
+                        <label class="form-label">Type</label>
+                        <div class="adj-toggle">
+                            <button class={addBtnClass}
+                                data-val="Addition"
+                                onclick={onAdjType}>+ Addition</button>
+                            <button class={subBtnClass}
+                                data-val="Subtraction"
+                                onclick={onAdjType}>− Subtraction</button>
+                        </div>
+                    </div>
+                </template>
 
                 <!-- Amount -->
                 <div class="form-group">
@@ -250,25 +73,25 @@
                         onchange={onAdjAmount}>
                 </div>
 
-                <!-- Reason -->
+                <!-- Notes -->
                 <div class="form-group">
-                    <label class="form-label">Reason *</label>
+                    <label class="form-label">Notes (optional)</label>
                     <input type="text" class="form-input"
-                        placeholder="e.g. Bag return from client"
-                        value={adjReason}
-                        onchange={onAdjReason}>
+                        placeholder="Add context..."
+                        value={adjNotes}
+                        onchange={onAdjNotes}>
                 </div>
 
                 <!-- Error -->
                 <template if:true={adjError}>
-                    <div class="form-error">{adjError}</div>
+                    <div class="form-error adj-err">{adjError}</div>
                 </template>
 
                 <button class="adj-save-btn"
                     onclick={handleAdjustSave}
                     disabled={isAdjSaving}>
                     <template if:false={isAdjSaving}>
-                        &#10003; Apply Adjustment
+                        &#10003; Apply
                     </template>
                     <template if:true={isAdjSaving}>
                         Saving...
@@ -463,8 +286,8 @@
                                 </div>
                                 <div class="hist-meta">
                                     {e.formattedDate}
-                                    <template if:true={e.Description__c}>
-                                        &middot; {e.Description__c}
+                                    <template if:true={e.Notes_Remarks__c}>
+                                        &middot; {e.Notes_Remarks__c}
                                     </template>
                                 </div>
                             </div>
@@ -472,11 +295,6 @@
                                 <div class="hist-amt">
                                     -&#8377;{e.formattedAmt}
                                 </div>
-                                <template if:true={e.Is_Reimbursed__c}>
-                                    <div class="reimb-badge">
-                                        Reimbursed
-                                    </div>
-                                </template>
                             </div>
                         </div>
                     </template>
@@ -501,43 +319,121 @@
 
     <template if:false={isLoading}>
 
+        <!-- QUARTER SELECTOR -->
+        <div class="qtr-selector-wrap">
+            <select class="qtr-selector" onchange={onQuarterChange}>
+                <option value="all">All Time</option>
+                <template for:each={availableQtrs} for:item="q">
+                    <option key={q} value={q}>{q}</option>
+                </template>
+            </select>
+            <div class="qtr-label">{quarterLabel}</div>
+        </div>
+
         <!-- TEAM TOTAL CARD -->
         <div class="team-card">
-            <div class="tc-label">Total Available — Team</div>
-            <div class="tc-amount">&#8377;{teamAvailable}</div>
+            <div class="tc-label">
+                <template if:true={isAllTime}>
+                    Total Available — Team
+                </template>
+                <template if:false={isAllTime}>
+                    Net Cash Flow — {quarterLabel}
+                </template>
+            </div>
+            <div class="tc-amount">&#8377;{displayedTeamAvailable}</div>
             <div class="tc-formula">
                 <div class="tcf-item">
                     <div class="tcf-val green">
-                        &#8377;{teamCollected}
+                        &#8377;{displayedTeamCollected}
                     </div>
                     <div class="tcf-label">Collected</div>
                 </div>
                 <div class="tcf-sep">−</div>
                 <div class="tcf-item">
                     <div class="tcf-val red">
-                        &#8377;{teamMfrPaid}
+                        &#8377;{displayedTeamMfrPaid}
                     </div>
                     <div class="tcf-label">Paid Mfr</div>
                 </div>
                 <div class="tcf-sep">−</div>
                 <div class="tcf-item">
                     <div class="tcf-val red">
-                        &#8377;{teamExpenses}
+                        &#8377;{displayedTeamExpenses}
                     </div>
                     <div class="tcf-label">Expenses</div>
+                </div>
+                <div class="tcf-sep">−</div>
+                <div class="tcf-item">
+                    <div class="tcf-val red">
+                        &#8377;{teamWithdrawn}
+                    </div>
+                    <div class="tcf-label">Withdrawn</div>
                 </div>
                 <div class="tcf-sep">=</div>
                 <div class="tcf-item">
                     <div class="tcf-val amber">
-                        &#8377;{teamAvailable}
+                        &#8377;{displayedTeamAvailable}
                     </div>
-                    <div class="tcf-label">Available</div>
+                    <div class="tcf-label">
+                        <template if:true={isAllTime}>Available</template>
+                        <template if:false={isAllTime}>Net Flow</template>
+                    </div>
                 </div>
             </div>
-            <div class="tc-updated">
-                Updated {teamLastUpdated}
-            </div>
+            <template if:true={isAllTime}>
+                <div class="tc-updated">Updated {teamLastUpdated}</div>
+            </template>
         </div>
+
+        <!-- QUARTERLY PERSON CARDS — shown when quarter selected -->
+        <template if:false={isAllTime}>
+            <template if:true={isQtrLoading}>
+                <div class="loading-wrap" style="padding:32px;text-align:center;">
+                    <div class="spinner"></div>
+                </div>
+            </template>
+            <template if:false={isQtrLoading}>
+                <template for:each={quarterPersonCards} for:item="p">
+                    <div key={p.name} class="person-card">
+                        <!-- Header row -->
+                        <div class="pc-top">
+                            <div class="pc-avatar">{p.initial}</div>
+                            <div class="pc-info">
+                                <div class="pc-name">{p.name}</div>
+                                <div class="pc-date">{quarterLabel}</div>
+                            </div>
+                            <div class="pc-avail">
+                                <div class="pc-avail-label">NET FLOW</div>
+                                <div class={p.netFlowClass}>
+                                    &#8377;{p.fmtNetFlow}
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Metrics row -->
+                        <div class="pc-metrics">
+                            <div class="pcm">
+                                <div class="pcm-val green">
+                                    &#8377;{p.fmtCollected}
+                                </div>
+                                <div class="pcm-label">Collected</div>
+                            </div>
+                            <div class="pcm">
+                                <div class="pcm-val red">
+                                    &#8377;{p.fmtMfrPaid}
+                                </div>
+                                <div class="pcm-label">Paid Mfr</div>
+                            </div>
+                            <div class="pcm">
+                                <div class="pcm-val red">
+                                    &#8377;{p.fmtExpenses}
+                                </div>
+                                <div class="pcm-label">Expenses</div>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </template>
+        </template>
 
         <!-- LOG EXPENSE BUTTON -->
         <div class="log-wrap">
@@ -556,39 +452,6 @@
                 <span class="log-arrow">&#8594;</span>
             </button>
         </div>
-
-        <!-- PROFIT DISTRIBUTION BUTTON -->
-        <div class="log-wrap">
-            <button class="dist-btn" onclick={openDistribution}>
-                <span class="log-icon">&#128184;</span>
-                <span class="log-text">Profit Distribution</span>
-                <span class="log-arrow">&#8594;</span>
-            </button>
-        </div>
-
-        <!-- WITHDRAWAL HISTORY -->
-        <template if:true={hasWithdrawals}>
-            <div class="section-label">PROFIT WITHDRAWALS</div>
-            <template for:each={withdrawalHistory}
-                for:item="w">
-                <div key={w.Id} class="withdrawal-card">
-                    <div class="wc-left">
-                        <div class="wc-quarter">{w.Quarter__c}</div>
-                        <div class="wc-date">{w.formattedDate}</div>
-                    </div>
-                    <div class="wc-right">
-                        <div class="wc-total">
-                            &#8377;{w.formattedTotal}
-                        </div>
-                        <div class="wc-split">
-                            V: &#8377;{w.formattedVikram} &nbsp;|&nbsp;
-                            R: &#8377;{w.formattedRohan} &nbsp;|&nbsp;
-                            Co: &#8377;{w.formattedCompany}
-                        </div>
-                    </div>
-                </div>
-            </template>
-        </template>
 
         <!-- PERSON CARDS -->
         <div class="people-section-label">By Team Member</div>
