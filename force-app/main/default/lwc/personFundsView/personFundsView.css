@@ -685,46 +685,33 @@
 .adj-add-icon { background: linear-gradient(135deg, #16a34a, #15803d); }
 .adj-sub-icon { background: linear-gradient(135deg, #dc2626, #b91c1c); }
 
-/* ── Quarter Selector Bar ───────────────────────────────────── */
-.qtr-bar {
-    padding: 10px 12px 0;
-}
-.qtr-bar-inner {
+/* ── Quarter Selector ───────────────────────────────────────── */
+.qtr-selector-wrap {
+    padding: 12px 12px 4px;
     display: flex;
     align-items: center;
-    background: #1e293b;
-    border-radius: 14px;
-    padding: 4px 14px 4px 6px;
-    gap: 8px;
-    position: relative;
+    gap: 10px;
 }
-.qtr-select {
-    appearance: none;
-    -webkit-appearance: none;
-    background: #f59e0b;
-    color: #000;
-    border: none;
+.qtr-selector {
+    flex: 1;
+    border: 1.5px solid #e5e7eb;
     border-radius: 10px;
-    padding: 8px 28px 8px 12px;
-    font-size: 13px;
-    font-weight: 800;
+    padding: 10px 12px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #111;
+    background: #fff;
     font-family: inherit;
     outline: none;
-    cursor: pointer;
-    min-width: 110px;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23000'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 8px center;
+    -webkit-appearance: none;
+    appearance: none;
 }
-.qtr-bar-icon {
-    font-size: 14px;
-    margin-left: 4px;
-}
-.qtr-bar-label {
+.qtr-selector:focus { border-color: #f59e0b; }
+.qtr-label {
     font-size: 12px;
+    color: #9ca3af;
     font-weight: 600;
-    color: #94a3b8;
-    flex: 1;
+    white-space: nowrap;
 }
 
 /* ── Quarterly Person Cards ─────────────────────────────────── */

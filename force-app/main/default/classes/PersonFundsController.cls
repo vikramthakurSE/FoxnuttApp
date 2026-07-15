@@ -189,11 +189,12 @@ public with sharing class PersonFundsController {
         ];
     }
 
-    // ── Manual Balance Adjustment ─────────────────────────────────────────
-    // Updates Total_Collected__c directly:
-    //   Addition     → increase collected (raises available)
-    //   Subtraction  → decrease collected (lowers available)
-    // Safe to use alongside triggers — triggers are delta-based.
+    // ── Balance Adjustment (with transfer + profit withdrawal support) ─────
+    // Reason options:
+    //   'Transferred to Vikram'  → deduct from person, add to Vikram
+    //   'Transferred to Rohan'   → deduct from person, add to Rohan
+    //   'Profit Withdrawal'      → deduct from person (goes to Total_Withdrawn__c)
+    //   'Balance Adjustment'     → add or subtract via adjustmentType
     @AuraEnabled
     public static void adjustBalance(
         String personName,

@@ -3,8 +3,8 @@ import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import { refreshApex } from '@salesforce/apex';
 import getFundsData from '@salesforce/apex/PersonFundsController.getFundsData';
 import saveExpense from '@salesforce/apex/PersonFundsController.saveExpense';
-import getAvailableQuarters      from '@salesforce/apex/PersonFundsController.getAvailableQuarters';
-import getQuarterlyFundsData    from '@salesforce/apex/PersonFundsController.getQuarterlyFundsData';
+import getAvailableQuarters from '@salesforce/apex/PersonFundsController.getAvailableQuarters';
+import getQuarterlyFundsData from '@salesforce/apex/PersonFundsController.getQuarterlyFundsData';
 import getExpensesForPerson
     from '@salesforce/apex/PersonFundsController.getExpensesForPerson';
 import adjustBalance
@@ -26,6 +26,7 @@ export default class PersonFundsView extends LightningElement {
     @track teamCollected   = '0.00';
     @track teamMfrPaid     = '0.00';
     @track teamExpenses    = '0.00';
+    @track teamWithdrawn   = '0.00';
     @track teamLastUpdated = '—';
 
     _recentPayments    = [];
@@ -37,18 +38,11 @@ export default class PersonFundsView extends LightningElement {
     @track isAdjSaving = false;
     @track adjPerson   = '';
     @track adjAmount   = '';
-    @track adjType     = 'Addition';
     @track adjReason   = '';
+    @track adjNotes    = '';
+    @track adjType     = 'Subtraction'; // default for most reasons
     @track adjError    = '';
     @track withdrawalHistory  = [];
-    // Profit Distribution
-    @track isDistOpen         = false;
-    @track isDistSaving       = false;
-    @track availableQuarters  = [];
-    @track distData           = null;
-    @track distAdjusted       = 0;
-    @track distDate           = new Date().toISOString().split('T')[0];
-    @track distNotes          = '';
 
     @wire(getFundsData)
     wiredData(result) {
@@ -71,16 +65,18 @@ export default class PersonFundsView extends LightningElement {
         this._adjustmentEntries = data.adjustmentEntries || [];
 
         // Compute totals from Person_Fund__c records directly
-        // so it stays in sync even after manual balance adjustments
+        // Must include Total_Withdrawn__c (profit distributions)
         const funds = data.funds || [];
-        const totalCollected  = funds.reduce((s, p) => s + (p.Total_Collected__c || 0), 0);
-        const totalMfrPaid    = funds.reduce((s, p) => s + (p.Total_Mfr_Paid__c  || 0), 0);
-        const totalExpenses   = funds.reduce((s, p) => s + (p.Total_Expenses__c  || 0), 0);
-        const totalAvailable  = totalCollected - totalMfrPaid - totalExpenses;
+        const totalCollected  = funds.reduce((s, p) => s + (p.Total_Collected__c  || 0), 0);
+        const totalMfrPaid    = funds.reduce((s, p) => s + (p.Total_Mfr_Paid__c   || 0), 0);
+        const totalExpenses   = funds.reduce((s, p) => s + (p.Total_Expenses__c   || 0), 0);
+        const totalWithdrawn  = funds.reduce((s, p) => s + (p.Total_Withdrawn__c  || 0), 0);
+        const totalAvailable  = totalCollected - totalMfrPaid - totalExpenses - totalWithdrawn;
 
         this.teamCollected   = this.fmt(totalCollected);
         this.teamMfrPaid     = this.fmt(totalMfrPaid);
         this.teamExpenses    = this.fmt(totalExpenses);
+        this.teamWithdrawn   = this.fmt(totalWithdrawn);
         this.teamAvailable   = this.fmt(totalAvailable);
         this.teamLastUpdated = new Date().toLocaleString('en-IN', {
             day: '2-digit', month: 'short',
@@ -225,118 +221,8 @@ export default class PersonFundsView extends LightningElement {
     }
 
     // Distribution computed getters
-    get distVikramAmt()  { return ((this.distAdjusted || 0) * 0.45).toFixed(2); }
-    get distRohanAmt()   { return ((this.distAdjusted || 0) * 0.45).toFixed(2); }
-    get distCompanyAmt() { return ((this.distAdjusted || 0) * 0.10).toFixed(2); }
-    get hasWithdrawals() { return (this.withdrawalHistory || []).length > 0; }
-
     get noPeople() {
         return !this.isLoading && this.personFunds.length === 0;
-    }
-
-    // ── Profit Distribution ───────────────────────────
-    openDistribution() {
-        this.isDistOpen = true;
-        this.distData   = null;
-        this.distAdjusted = 0;
-        this.distDate   = new Date().toISOString().split('T')[0];
-        this.distNotes  = '';
-        // Load quarters
-        getAvailableQuarters()
-            .then(qs => { this.availableQuarters = qs || []; })
-            .catch(() => {});
-        // Load history
-        this.loadWithdrawalHistory();
-    }
-
-    closeDistribution() { this.isDistOpen = false; }
-
-    loadWithdrawalHistory() {
-        getWithdrawalHistory()
-            .then(list => {
-                this.withdrawalHistory = (list || []).map(w => ({
-                    ...w,
-                    formattedDate:    this.fmtDate(w.Withdrawal_Date__c),
-                    formattedTotal:   this.fmt(w.Adjusted_Profit__c),
-                    formattedVikram:  this.fmt(w.Vikram_Amount__c),
-                    formattedRohan:   this.fmt(w.Rohan_Amount__c),
-                    formattedCompany: this.fmt(w.Company_Reserve__c)
-                }));
-            })
-            .catch(() => {});
-    }
-
-    onDistQuarter(e) {
-        const quarter = e.target.value;
-        if (!quarter) { this.distData = null; return; }
-        getQuarterlyProfit({ quarter })
-            .then(data => {
-                this.distData = {
-                    ...data,
-                    revenueFormatted:    this.fmt(data.revenue),
-                    grossMarginFormatted: this.fmt(data.grossMargin),
-                    expensesFormatted:   this.fmt(data.expenses),
-                    netProfitFormatted:  this.fmt(data.netProfit),
-                    existingVikramFmt:   this.fmt(data.existingVikram),
-                    existingRohanFmt:    this.fmt(data.existingRohan),
-                    existingCompanyFmt:  this.fmt(data.existingCompany)
-                };
-                this.distAdjusted = parseFloat(data.netProfit) || 0;
-            })
-            .catch(err => {
-                this.dispatchEvent(new ShowToastEvent({
-                    title: 'Error', variant: 'error',
-                    message: err.body?.message || 'Could not load profit data.'
-                }));
-            });
-    }
-
-    onDistAdjusted(e) { this.distAdjusted = parseFloat(e.target.value) || 0; }
-    onDistDate(e)     { this.distDate  = e.target.value; }
-    onDistNotes(e)    { this.distNotes = e.target.value; }
-
-    confirmDistribution() {
-        if (!this.distData?.quarter) {
-            this.dispatchEvent(new ShowToastEvent({
-                title: 'Select a quarter', variant: 'warning',
-                message: 'Please select a quarter first.'
-            }));
-            return;
-        }
-        if (!this.distAdjusted || this.distAdjusted <= 0) {
-            this.dispatchEvent(new ShowToastEvent({
-                title: 'Invalid amount', variant: 'warning',
-                message: 'Profit must be greater than 0.'
-            }));
-            return;
-        }
-
-        this.isDistSaving = true;
-        executeDistribution({
-            quarter:        this.distData.quarter,
-            adjustedProfit: this.distAdjusted,
-            withdrawalDate: this.distDate,
-            notes:          this.distNotes
-        })
-        .then(result => {
-            this.isDistSaving = false;
-            this.isDistOpen   = false;
-            this.dispatchEvent(new ShowToastEvent({
-                title:   'Profit Distributed! 🎉',
-                variant: 'success',
-                message: 'Vikram: ₹' + result.vikramAmt +
-                         ' | Rohan: ₹' + result.rohanAmt +
-                         ' | Company: ₹' + result.companyAmt
-            }));
-            return refreshApex(this.wiredResult);
-        })
-        .catch(err => {
-            this.isDistSaving = false;
-            this.dispatchEvent(new ShowToastEvent({
-                title: 'Error', variant: 'error',
-                message: err.body?.message || 'Distribution failed.'
-            }));
-        });
     }
 
     // ── Log Expense ────────────────────────────────────────
@@ -644,28 +530,58 @@ export default class PersonFundsView extends LightningElement {
     openAdjust() {
         this.adjPerson  = '';
         this.adjAmount  = '';
-        this.adjType    = 'Addition';
         this.adjReason  = '';
+        this.adjNotes   = '';
+        this.adjType    = 'Subtraction';
         this.adjError   = '';
         this.isAdjOpen  = true;
     }
     closeAdjust() { this.isAdjOpen = false; }
 
-    onAdjPerson(e)  { this.adjPerson = e.target.value; }
+    onAdjPerson(e)  { this.adjPerson = e.target.value; this.adjError = ''; }
     onAdjAmount(e)  { this.adjAmount = e.target.value; }
+    onAdjReason(e)  {
+        this.adjReason = e.target.value;
+        this.adjError  = '';
+        // Balance Adjustment needs type toggle; others are always subtraction
+        if (this.adjReason === 'Balance Adjustment') {
+            this.adjType = 'Addition';
+        } else {
+            this.adjType = 'Subtraction';
+        }
+    }
+    onAdjNotes(e)   { this.adjNotes  = e.target.value; }
     onAdjType(e)    { this.adjType   = e.currentTarget.dataset.val; }
-    onAdjReason(e)  { this.adjReason = e.target.value; }
+
+    // Show type toggle only for Balance Adjustment
+    get showTypeToggle() { return this.adjReason === 'Balance Adjustment'; }
+
+    get addBtnClass() {
+        return this.adjType === 'Addition'
+            ? 'adj-toggle-btn adj-active-add' : 'adj-toggle-btn';
+    }
+    get subBtnClass() {
+        return this.adjType === 'Subtraction'
+            ? 'adj-toggle-btn adj-active-sub' : 'adj-toggle-btn';
+    }
 
     handleAdjustSave() {
         this.adjError = '';
+
         if (!this.adjPerson) {
             this.adjError = 'Select a person.'; return;
+        }
+        if (!this.adjReason) {
+            this.adjError = 'Select a reason.'; return;
         }
         if (!this.adjAmount || parseFloat(this.adjAmount) <= 0) {
             this.adjError = 'Enter a valid amount.'; return;
         }
-        if (!this.adjReason.trim()) {
-            this.adjError = 'Enter a reason.'; return;
+
+        // Validate: cannot transfer to yourself
+        if ((this.adjReason === 'Transferred to Vikram' && this.adjPerson === 'Vikram') ||
+            (this.adjReason === 'Transferred to Rohan'  && this.adjPerson === 'Rohan')) {
+            this.adjError = 'Cannot transfer to yourself.'; return;
         }
 
         this.isAdjSaving = true;
@@ -673,23 +589,30 @@ export default class PersonFundsView extends LightningElement {
             personName:     this.adjPerson,
             amount:         parseFloat(this.adjAmount),
             adjustmentType: this.adjType,
-            reason:         this.adjReason
+            reason:         this.adjReason,
+            notes:          this.adjNotes || ''
         })
         .then(() => {
             this.isAdjSaving = false;
             this.isAdjOpen   = false;
-            const sign = this.adjType === 'Addition' ? '+' : '-';
+            let msg = '';
+            if (this.adjReason === 'Transferred to Vikram' || this.adjReason === 'Transferred to Rohan') {
+                const toName = this.adjReason === 'Transferred to Vikram' ? 'Vikram' : 'Rohan';
+                msg = '₹' + this.adjAmount + ' transferred to ' + toName;
+            } else if (this.adjReason === 'Profit Withdrawal') {
+                msg = '₹' + this.adjAmount + ' profit withdrawn for ' + this.adjPerson;
+            } else {
+                const sign = this.adjType === 'Addition' ? '+' : '-';
+                msg = sign + '₹' + this.adjAmount + ' adjusted for ' + this.adjPerson;
+            }
             this.dispatchEvent(new ShowToastEvent({
-                title:   'Balance Adjusted ✓',
-                variant: 'success',
-                message: sign + '₹' + this.adjAmount +
-                         ' applied to ' + this.adjPerson
+                title: 'Done ✓', variant: 'success', message: msg
             }));
             return refreshApex(this.wiredResult);
         })
         .catch(err => {
             this.isAdjSaving = false;
-            this.adjError = err.body?.message || 'Adjustment failed.';
+            this.adjError = err.body?.message || 'Failed. Try again.';
         });
     }
 }
