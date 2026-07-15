@@ -3,6 +3,8 @@ import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import { refreshApex } from '@salesforce/apex';
 import getFundsData from '@salesforce/apex/PersonFundsController.getFundsData';
 import saveExpense from '@salesforce/apex/PersonFundsController.saveExpense';
+import getAvailableQuarters      from '@salesforce/apex/PersonFundsController.getAvailableQuarters';
+import getQuarterlyFundsData    from '@salesforce/apex/PersonFundsController.getQuarterlyFundsData';
 import getExpensesForPerson
     from '@salesforce/apex/PersonFundsController.getExpensesForPerson';
 import adjustBalance
@@ -10,7 +12,11 @@ import adjustBalance
 
 export default class PersonFundsView extends LightningElement {
 
-    @track isLoading    = true;
+    @track isLoading          = true;
+    @track availableQtrs      = [];
+    @track selectedQtr        = 'all';
+    @track isQtrLoading       = false;
+    @track qtrData            = null;
     @track personFunds  = [];
     @track expenseTypes = [];
     @track teamMembers  = [];
@@ -158,8 +164,8 @@ export default class PersonFundsView extends LightningElement {
                 iconClass:  'txn-icon expense-icon',
                 title:      e.Expense_Type__c || 'Expense',
                 meta:       this.fmtDate(e.Expense_Date__c) +
-                            (e.Description__c
-                              ? ' · ' + e.Description__c : ''),
+                            (e.Notes_Remarks__c
+                              ? ' · ' + e.Notes_Remarks__c : ''),
                 amtDisplay: '-₹' + this.fmt(e.Amount__c),
                 amtClass:   'txn-amt negative',
                 date:       e.Expense_Date__c
@@ -496,7 +502,7 @@ export default class PersonFundsView extends LightningElement {
                     iconClass:  'txn-icon expense-icon',
                     title:      e.Expense_Type__c || 'Expense',
                     meta:       this.fmtDate(e.Expense_Date__c) +
-                                (e.Description__c ? ' · ' + e.Description__c : ''),
+                                (e.Notes_Remarks__c ? ' · ' + e.Notes_Remarks__c : ''),
                     amtDisplay: '-₹' + this.fmt(e.Amount__c),
                     amtClass:   'txn-amt negative',
                     date:       e.Expense_Date__c
@@ -547,6 +553,72 @@ export default class PersonFundsView extends LightningElement {
     }
 
     closeActivity() { this.isActivityOpen = false; }
+
+    // ── Quarter Selector ────────────────────────────────────────────────
+    get isAllTime() { return this.selectedQtr === 'all'; }
+
+    get quarterLabel() {
+        if (this.selectedQtr === 'all') return 'All Time';
+        const parts  = this.selectedQtr.split('_');
+        const qNum   = parts[0].replace('Qtr', '');
+        const yr     = parts[1];
+        const months = { '1':'Jan–Mar', '2':'Apr–Jun', '3':'Jul–Sep', '4':'Oct–Dec' };
+        return 'Q' + qNum + ' ' + yr + '  (' + (months[qNum] || '') + ')';
+    }
+
+    get displayedTeamCollected() {
+        return this.qtrData ? this.fmt(this.qtrData.teamCollected) : this.teamCollected;
+    }
+    get displayedTeamMfrPaid() {
+        return this.qtrData ? this.fmt(this.qtrData.teamMfrPaid)  : this.teamMfrPaid;
+    }
+    get displayedTeamExpenses() {
+        return this.qtrData ? this.fmt(this.qtrData.teamExpenses) : this.teamExpenses;
+    }
+    get displayedTeamAvailable() {
+        return this.qtrData ? this.fmt(this.qtrData.teamNetFlow)  : this.teamAvailable;
+    }
+
+    get quarterPersonCards() {
+        if (!this.qtrData) return [];
+        return (this.qtrData.personSummaries || []).map(p => ({
+            ...p,
+            initial:     p.name ? p.name.charAt(0).toUpperCase() : '?',
+            fmtCollected : this.fmt(p.collected),
+            fmtMfrPaid   : this.fmt(p.mfrPaid),
+            fmtExpenses  : this.fmt(p.expenses),
+            fmtNetFlow   : this.fmt(Math.abs(p.netFlow)),
+            netFlowClass : parseFloat(p.netFlow) >= 0
+                           ? 'pc-avail-amt positive'
+                           : 'pc-avail-amt negative'
+        }));
+    }
+
+    get qtrRecentPayments()    { return this.qtrData ? this.qtrData.recentPayments    || [] : this._recentPayments; }
+    get qtrRecentMfrPayments() { return this.qtrData ? this.qtrData.recentMfrPayments || [] : this._recentMfrPayments; }
+    get qtrRecentExpenses()    { return this.qtrData ? this.qtrData.recentExpenses    || [] : this._recentExpenses; }
+
+    onQuarterChange(e) {
+        const val = e.target.value;
+        this.selectedQtr = val;
+        if (val === 'all') {
+            this.qtrData = null;
+            return;
+        }
+        this.isQtrLoading = true;
+        getQuarterlyFundsData({ quarter: val })
+            .then(data => {
+                this.qtrData      = data;
+                this.isQtrLoading = false;
+            })
+            .catch(() => { this.isQtrLoading = false; });
+    }
+
+    connectedCallback() {
+        getAvailableQuarters()
+            .then(qtrs => { this.availableQtrs = qtrs || []; })
+            .catch(() => {});
+    }
 
     _scrollToTop() {
         setTimeout(() => {

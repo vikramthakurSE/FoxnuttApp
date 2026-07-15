@@ -684,3 +684,104 @@
 /* Adjustment activity icons */
 .adj-add-icon { background: linear-gradient(135deg, #16a34a, #15803d); }
 .adj-sub-icon { background: linear-gradient(135deg, #dc2626, #b91c1c); }
+
+/* ── Quarter Selector Bar ───────────────────────────────────── */
+.qtr-bar {
+    padding: 10px 12px 0;
+}
+.qtr-bar-inner {
+    display: flex;
+    align-items: center;
+    background: #1e293b;
+    border-radius: 14px;
+    padding: 4px 14px 4px 6px;
+    gap: 8px;
+    position: relative;
+}
+.qtr-select {
+    appearance: none;
+    -webkit-appearance: none;
+    background: #f59e0b;
+    color: #000;
+    border: none;
+    border-radius: 10px;
+    padding: 8px 28px 8px 12px;
+    font-size: 13px;
+    font-weight: 800;
+    font-family: inherit;
+    outline: none;
+    cursor: pointer;
+    min-width: 110px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23000'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+}
+.qtr-bar-icon {
+    font-size: 14px;
+    margin-left: 4px;
+}
+.qtr-bar-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #94a3b8;
+    flex: 1;
+}
+
+/* ── Quarterly Person Cards ─────────────────────────────────── */
+.qtr-person-card {
+    background: #fff;
+    border-radius: 14px;
+    margin: 8px 12px;
+    padding: 16px;
+    box-shadow: 0 1px 6px rgba(0,0,0,.07);
+    border-left: 4px solid #f59e0b;
+}
+.qpc-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+.qpc-avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #312e81, #4f46e5);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.qpc-name { font-size: 15px; font-weight: 800; color: #111; }
+.qpc-sub  { font-size: 11px; color: #9ca3af; margin-top: 2px; }
+.qtr-net  {
+    margin-left: auto;
+    font-size: 18px;
+    font-weight: 900;
+}
+.qtr-net.positive { color: #16a34a; }
+.qtr-net.negative { color: #dc2626; }
+.qpc-stats {
+    display: flex;
+    gap: 8px;
+}
+.qpc-stat {
+    flex: 1;
+    background: #f9fafb;
+    border-radius: 8px;
+    padding: 10px 6px;
+    text-align: center;
+}
+.qpc-stat-val {
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 3px;
+}
+.qpc-stat-label {
+    font-size: 10px;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}

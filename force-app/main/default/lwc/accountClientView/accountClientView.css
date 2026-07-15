@@ -293,3 +293,93 @@
 .fin-invoice { padding-top: 2px; }
 .fin-net     { padding-top: 2px; }
 .fin-cd-row  { padding: 2px 0; }
+
+/* ── Follow Up Section ─────────────────────────────────────── */
+.followup-section {
+    margin: 0 12px 16px;
+    background: #fff;
+    border-radius: 14px;
+    padding: 16px;
+    box-shadow: 0 1px 6px rgba(0,0,0,.07);
+    border-left: 4px solid #f59e0b;
+}
+.followup-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+.followup-title {
+    font-size: 13px;
+    font-weight: 800;
+    color: #111;
+}
+.followup-date {
+    font-size: 11px;
+    color: #9ca3af;
+}
+.followup-notes {
+    width: 100%;
+    border: 1.5px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 13px;
+    font-family: inherit;
+    color: #374151;
+    resize: none;
+    box-sizing: border-box;
+    margin-bottom: 10px;
+    outline: none;
+}
+.followup-notes:focus { border-color: #f59e0b; }
+.followup-btn {
+    width: 100%;
+    background: #f3f4f6;
+    color: #374151;
+    border: 1.5px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 12px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all .2s;
+}
+.followup-active {
+    background: #f0fdf4;
+    color: #16a34a;
+    border-color: #86efac;
+}
+.followup-status {
+    margin-top: 8px;
+    font-size: 11px;
+    color: #16a34a;
+    font-weight: 600;
+    text-align: center;
+}
+
+/* Follow Up History Log */
+.followup-history-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    margin-top: 12px;
+    margin-bottom: 6px;
+}
+.followup-history {
+    background: #f9fafb;
+    border-radius: 8px;
+    padding: 10px 12px;
+    max-height: 150px;
+    overflow-y: auto;
+}
+.followup-history-row {
+    font-size: 12px;
+    color: #374151;
+    padding: 4px 0;
+    border-bottom: 1px solid #f0f0f0;
+    line-height: 1.5;
+}
+.followup-history-row:last-child { border-bottom: none; }
