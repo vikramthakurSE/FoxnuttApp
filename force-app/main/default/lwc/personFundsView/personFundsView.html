@@ -463,8 +463,8 @@
                                 </div>
                                 <div class="hist-meta">
                                     {e.formattedDate}
-                                    <template if:true={e.Description__c}>
-                                        &middot; {e.Description__c}
+                                    <template if:true={e.Notes_Remarks__c}>
+                                        &middot; {e.Notes_Remarks__c}
                                     </template>
                                 </div>
                             </div>
@@ -472,11 +472,6 @@
                                 <div class="hist-amt">
                                     -&#8377;{e.formattedAmt}
                                 </div>
-                                <template if:true={e.Is_Reimbursed__c}>
-                                    <div class="reimb-badge">
-                                        Reimbursed
-                                    </div>
-                                </template>
                             </div>
                         </div>
                     </template>
@@ -501,43 +496,117 @@
 
     <template if:false={isLoading}>
 
+        <!-- QUARTER SELECTOR -->
+        <div class="qtr-bar">
+            <div class="qtr-bar-inner">
+                <select class="qtr-select" onchange={onQuarterChange}>
+                    <option value="all">All Time</option>
+                    <template for:each={availableQtrs} for:item="q">
+                        <option key={q} value={q}>{q}</option>
+                    </template>
+                </select>
+                <div class="qtr-bar-icon">&#128197;</div>
+                <div class="qtr-bar-label">{quarterLabel}</div>
+            </div>
+        </div>
+
         <!-- TEAM TOTAL CARD -->
         <div class="team-card">
-            <div class="tc-label">Total Available — Team</div>
-            <div class="tc-amount">&#8377;{teamAvailable}</div>
+            <div class="tc-label">
+                <template if:true={isAllTime}>
+                    Total Available — Team
+                </template>
+                <template if:false={isAllTime}>
+                    Net Cash Flow — {quarterLabel}
+                </template>
+            </div>
+            <div class="tc-amount">&#8377;{displayedTeamAvailable}</div>
             <div class="tc-formula">
                 <div class="tcf-item">
                     <div class="tcf-val green">
-                        &#8377;{teamCollected}
+                        &#8377;{displayedTeamCollected}
                     </div>
                     <div class="tcf-label">Collected</div>
                 </div>
                 <div class="tcf-sep">−</div>
                 <div class="tcf-item">
                     <div class="tcf-val red">
-                        &#8377;{teamMfrPaid}
+                        &#8377;{displayedTeamMfrPaid}
                     </div>
                     <div class="tcf-label">Paid Mfr</div>
                 </div>
                 <div class="tcf-sep">−</div>
                 <div class="tcf-item">
                     <div class="tcf-val red">
-                        &#8377;{teamExpenses}
+                        &#8377;{displayedTeamExpenses}
                     </div>
                     <div class="tcf-label">Expenses</div>
                 </div>
                 <div class="tcf-sep">=</div>
                 <div class="tcf-item">
                     <div class="tcf-val amber">
-                        &#8377;{teamAvailable}
+                        &#8377;{displayedTeamAvailable}
                     </div>
-                    <div class="tcf-label">Available</div>
+                    <div class="tcf-label">
+                        <template if:true={isAllTime}>Available</template>
+                        <template if:false={isAllTime}>Net Flow</template>
+                    </div>
                 </div>
             </div>
-            <div class="tc-updated">
-                Updated {teamLastUpdated}
-            </div>
+            <template if:true={isAllTime}>
+                <div class="tc-updated">Updated {teamLastUpdated}</div>
+            </template>
         </div>
+
+        <!-- QUARTERLY PERSON CARDS — shown when quarter selected -->
+        <template if:false={isAllTime}>
+            <template if:true={isQtrLoading}>
+                <div class="loading-wrap" style="padding:32px;text-align:center;">
+                    <div class="spinner"></div>
+                </div>
+            </template>
+            <template if:false={isQtrLoading}>
+                <template for:each={quarterPersonCards} for:item="p">
+                    <div key={p.name} class="person-card">
+                        <!-- Header row -->
+                        <div class="pc-top">
+                            <div class="pc-avatar">{p.initial}</div>
+                            <div class="pc-info">
+                                <div class="pc-name">{p.name}</div>
+                                <div class="pc-date">{quarterLabel}</div>
+                            </div>
+                            <div class="pc-avail">
+                                <div class="pc-avail-label">NET FLOW</div>
+                                <div class={p.netFlowClass}>
+                                    &#8377;{p.fmtNetFlow}
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Metrics row -->
+                        <div class="pc-metrics">
+                            <div class="pcm">
+                                <div class="pcm-val green">
+                                    &#8377;{p.fmtCollected}
+                                </div>
+                                <div class="pcm-label">Collected</div>
+                            </div>
+                            <div class="pcm">
+                                <div class="pcm-val red">
+                                    &#8377;{p.fmtMfrPaid}
+                                </div>
+                                <div class="pcm-label">Paid Mfr</div>
+                            </div>
+                            <div class="pcm">
+                                <div class="pcm-val red">
+                                    &#8377;{p.fmtExpenses}
+                                </div>
+                                <div class="pcm-label">Expenses</div>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </template>
+        </template>
 
         <!-- LOG EXPENSE BUTTON -->
         <div class="log-wrap">
