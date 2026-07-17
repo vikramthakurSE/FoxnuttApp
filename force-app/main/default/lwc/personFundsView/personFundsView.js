@@ -212,6 +212,15 @@ export default class PersonFundsView extends LightningElement {
     }
 
     fmt(val)  { return (parseFloat(val) || 0).toFixed(2); }
+
+    compact(val) {
+        const num  = parseFloat(val) || 0;
+        const sign = num < 0 ? '-' : '';
+        const abs  = Math.abs(num);
+        if (abs >= 100000) return sign + parseFloat((abs / 100000).toFixed(2)) + 'L';
+        if (abs >= 1000)   return sign + parseFloat((abs / 1000).toFixed(1)) + 'k';
+        return sign + Math.round(abs);
+    }
     fmtDate(d) {
         if (!d) return '—';
         return new Date(d + 'T00:00:00')
@@ -247,10 +256,10 @@ export default class PersonFundsView extends LightningElement {
         this.expDesc      = '';
         this.expenseError = '';
         this.isExpenseOpen = true;
-        this._scrollToTop();
+        this._lockScroll();
     }
 
-    closeExpense() { this.isExpenseOpen = false; }
+    closeExpense() { this.isExpenseOpen = false; this._unlockScroll(); }
     onExpAmount(e)  { this.expAmount  = e.target.value; }
     onExpDate(e)    { this.expDate    = e.target.value; }
     onExpType(e)    { this.expType    = e.target.value; }
@@ -283,7 +292,7 @@ export default class PersonFundsView extends LightningElement {
         })
         .then(() => {
             this.isExpSaving   = false;
-            this.isExpenseOpen = false;
+            this.closeExpense();
             return refreshApex(this.wiredResult);
         })
         .then(() => {
@@ -323,7 +332,7 @@ export default class PersonFundsView extends LightningElement {
         this.isHistoryOpen    = true;
         this.isHistoryLoading = true;
         this.expenseHistory   = [];
-        this._scrollToTop();
+        this._lockScroll();
 
         getExpensesForPerson({ personName: this.historyPerson })
         .then(data => {
@@ -337,7 +346,7 @@ export default class PersonFundsView extends LightningElement {
         .catch(() => { this.isHistoryLoading = false; });
     }
 
-    closeHistory() { this.isHistoryOpen = false; }
+    closeHistory() { this.isHistoryOpen = false; this._unlockScroll(); }
 
     // ── View All Activity ───────────────────────────────────────────────
     get noActivityHistory() {
@@ -349,6 +358,7 @@ export default class PersonFundsView extends LightningElement {
         this.activityPerson    = person;
         this.isActivityOpen    = true;
         this.isActivityLoading = true;
+        this._lockScroll();
 
         // Build full transaction list — same as buildTransactions but no slice limit
         try {
@@ -438,7 +448,7 @@ export default class PersonFundsView extends LightningElement {
         }
     }
 
-    closeActivity() { this.isActivityOpen = false; }
+    closeActivity() { this.isActivityOpen = false; this._unlockScroll(); }
 
     // ── Quarter Selector ────────────────────────────────────────────────
     get isAllTime() { return this.selectedQtr === 'all'; }
@@ -464,6 +474,12 @@ export default class PersonFundsView extends LightningElement {
     get displayedTeamAvailable() {
         return this.qtrData ? this.fmt(this.qtrData.teamNetFlow)  : this.teamAvailable;
     }
+
+    get compactTeamCollected() { return this.compact(this.displayedTeamCollected); }
+    get compactTeamMfrPaid()   { return this.compact(this.displayedTeamMfrPaid); }
+    get compactTeamExpenses()  { return this.compact(this.displayedTeamExpenses); }
+    get compactTeamWithdrawn() { return this.compact(this.teamWithdrawn); }
+    get compactTeamAvailable() { return this.compact(this.displayedTeamAvailable); }
 
     get quarterPersonCards() {
         if (!this.qtrData) return [];
@@ -506,13 +522,13 @@ export default class PersonFundsView extends LightningElement {
             .catch(() => {});
     }
 
-    _scrollToTop() {
-        setTimeout(() => {
-            try {
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            } catch(e) { /* silent */ }
-        }, 50);
+    _lockScroll() {
+        try {
+            window.scrollTo(0, 0);
+        } catch (e) { /* silent */ }
     }
+
+    _unlockScroll() { /* no-op: background scroll was never altered on close */ }
 
     // Adjust balance toggle classes
     get addBtnClass() {
@@ -535,8 +551,9 @@ export default class PersonFundsView extends LightningElement {
         this.adjType    = 'Subtraction';
         this.adjError   = '';
         this.isAdjOpen  = true;
+        this._lockScroll();
     }
-    closeAdjust() { this.isAdjOpen = false; }
+    closeAdjust() { this.isAdjOpen = false; this._unlockScroll(); }
 
     onAdjPerson(e)  { this.adjPerson = e.target.value; this.adjError = ''; }
     onAdjAmount(e)  { this.adjAmount = e.target.value; }
@@ -594,7 +611,7 @@ export default class PersonFundsView extends LightningElement {
         })
         .then(() => {
             this.isAdjSaving = false;
-            this.isAdjOpen   = false;
+            this.closeAdjust();
             let msg = '';
             if (this.adjReason === 'Transferred to Vikram' || this.adjReason === 'Transferred to Rohan') {
                 const toName = this.adjReason === 'Transferred to Vikram' ? 'Vikram' : 'Rohan';
