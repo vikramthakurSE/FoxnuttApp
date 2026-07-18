@@ -256,12 +256,15 @@ public class QuarterlyReportHelper {
         expenses = expenses != null ? expenses : 0;
         m.put('expenses', expenses);
 
+        // Attributed to the quarter the PURCHASE was placed, not when the
+        // payment was actually made — a late-settled payment should not
+        // distort cash flow in the quarter it happened to be paid in
         Decimal mfrPaid = 0;
         AggregateResult mfrAR = [
             SELECT SUM(Amount_Paid__c) total
             FROM Manufacturer_Payment__c
-            WHERE Payment_Date__c >= :startDate
-            AND   Payment_Date__c <= :endDate
+            WHERE Purchase__r.Order_Date__c >= :startDate
+            AND   Purchase__r.Order_Date__c <= :endDate
         ];
         mfrPaid = (Decimal) mfrAR.get('total');
         mfrPaid = mfrPaid != null ? mfrPaid : 0;

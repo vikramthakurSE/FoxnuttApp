@@ -276,14 +276,16 @@ public with sharing class PersonFundsController {
             quarters.add('Qtr' + q + '_' + yr);
         }
 
-        // From mfr payments
+        // From mfr payments — bucketed by the related Purchase's order date,
+        // not the payment date, so a late payment still counts in the
+        // quarter the order was placed
         for (AggregateResult ar : [
-            SELECT CALENDAR_YEAR(Payment_Date__c) yr,
-                   CALENDAR_MONTH(Payment_Date__c) mo
+            SELECT CALENDAR_YEAR(Purchase__r.Order_Date__c) yr,
+                   CALENDAR_MONTH(Purchase__r.Order_Date__c) mo
             FROM Manufacturer_Payment__c
-            WHERE Payment_Date__c != null
-            GROUP BY CALENDAR_YEAR(Payment_Date__c),
-                     CALENDAR_MONTH(Payment_Date__c)
+            WHERE Purchase__r.Order_Date__c != null
+            GROUP BY CALENDAR_YEAR(Purchase__r.Order_Date__c),
+                     CALENDAR_MONTH(Purchase__r.Order_Date__c)
         ]) {
             Integer yr = (Integer) ar.get('yr');
             Integer mo = (Integer) ar.get('mo');
@@ -352,14 +354,16 @@ public with sharing class PersonFundsController {
             );
         }
 
-        // Per-person mfr paid
+        // Per-person mfr paid — attributed to the quarter the PURCHASE was
+        // placed (Purchase__r.Order_Date__c), not when the payment was made,
+        // so a payment settled late doesn't distort the quarter it's paid in
         Map<String, Decimal> mfrPaid = new Map<String, Decimal>();
         for (AggregateResult ar : [
             SELECT Paid_By__c person, SUM(Amount_Paid__c) total
             FROM Manufacturer_Payment__c
             WHERE Paid_By__c != null
-            AND Payment_Date__c >= :qStart
-            AND Payment_Date__c <= :qEnd
+            AND Purchase__r.Order_Date__c >= :qStart
+            AND Purchase__r.Order_Date__c <= :qEnd
             GROUP BY Paid_By__c
         ]) {
             Decimal amt = (Decimal) ar.get('total');
@@ -409,11 +413,11 @@ public with sharing class PersonFundsController {
         List<Manufacturer_Payment__c> recentMfrPayments = [
             SELECT Id, Amount_Paid__c, Payment_Date__c,
                    Mode_of_Payment__c, Paid_By__c,
-                   Purchase__r.Name,
+                   Purchase__r.Name, Purchase__r.Order_Date__c,
                    Purchase__r.Supplier__r.Name
             FROM Manufacturer_Payment__c
-            WHERE Payment_Date__c >= :qStart
-            AND Payment_Date__c <= :qEnd
+            WHERE Purchase__r.Order_Date__c >= :qStart
+            AND Purchase__r.Order_Date__c <= :qEnd
             ORDER BY Payment_Date__c DESC
             LIMIT 50
         ];
