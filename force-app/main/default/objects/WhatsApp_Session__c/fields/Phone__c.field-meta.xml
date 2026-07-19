@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Phone__c</fullName>
+    <label>Phone</label>
+    <type>Text</type>
+    <length>20</length>
+    <unique>true</unique>
+    <externalId>true</externalId>
+    <caseSensitive>false</caseSensitive>
+    <required>true</required>
+    <description>Client phone, last 10 digits only. External ID so the bot can upsert session state by phone.</description>
+</CustomField>
