@@ -183,6 +183,14 @@ public class FollowUpNotificationHelper {
         ClientDeliveryData data,
         Map<Id, Account> accountMap
     ) {
+        // WhatsApp (order_followup_reminder + Re-order button) only goes out
+        // Tuesday & Saturday — push notifications still fire every day below.
+        String dayName = Datetime.newInstance(
+            today, Time.newInstance(0, 0, 0, 0)
+        ).format('EEEE');
+        Boolean sendWhatsAppToday =
+            dayName == 'Tuesday' || dayName == 'Saturday';
+
         Set<Id> eligibleSaleIds = new Set<Id>();
         List<Sale__c> toNotify = new List<Sale__c>();
 
@@ -241,6 +249,12 @@ public class FollowUpNotificationHelper {
                 notif.send(recipientIds);
             } catch (Exception e) {
                 System.debug('Follow-up failed: ' + e.getMessage());
+            }
+
+            if (sendWhatsAppToday && String.isNotBlank(s.Client__r.Phone)) {
+                WhatsAppHelper.dispatchOrderFollowUp(
+                    s.Client__r.Phone, s.Client__r.Name, dateStr
+                );
             }
         }
     }

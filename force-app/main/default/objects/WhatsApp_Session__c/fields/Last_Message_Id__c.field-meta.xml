@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
-    <fullName>Last_Message_Id__c</fullName>
-    <label>Last Message Id</label>
-    <type>Text</type>
-    <length>128</length>
-    <description>WhatsApp message id last processed for this phone — used to ignore Meta webhook retry duplicates.</description>
-</CustomField>

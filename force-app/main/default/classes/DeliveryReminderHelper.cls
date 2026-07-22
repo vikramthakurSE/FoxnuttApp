@@ -37,7 +37,8 @@ public class DeliveryReminderHelper {
 
         if (!dueToday.isEmpty()) {
             sendReminderEmail(dueToday, 'today', admins);
-            NotificationHelper.notifyDeliveryReminder(dueToday, true);
+            // Push for "due today" now fires at 11 AM via
+            // DeliveryStatusReminderHelper, not here, to avoid a duplicate.
         }
         if (!dueTomorrow.isEmpty()) {
             sendReminderEmail(dueTomorrow, 'tomorrow', admins);

@@ -192,6 +192,28 @@ public class NotificationHelper {
     }
 
     // ════════════════════════════════════════════════════════════════════════
+    // 4b. DELIVERY DELAYED — expected date has passed, still undelivered.
+    // Fires twice daily (11 AM & 2 PM) until the order is marked Delivered.
+    // ════════════════════════════════════════════════════════════════════════
+    public static void notifyDeliveryDelayed(List<Sale__c> sales) {
+        if (sales.isEmpty()) return;
+
+        Decimal totalValue = 0;
+        for (Sale__c s : sales) {
+            totalValue += s.Total_Revenue__c != null
+                ? s.Total_Revenue__c : 0;
+        }
+
+        send(
+            TYPE_DELIVERY,
+            '⚠️ ' + sales.size() + ' Delivery(ies) DELAYED',
+            'Past expected delivery date — total value: ₹' +
+            totalValue.setScale(0) + ' · Tap to view orders',
+            null
+        );
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
     // 5. NEW PURCHASE CREATED
     // ════════════════════════════════════════════════════════════════════════
     public static void notifyNewPurchase(
