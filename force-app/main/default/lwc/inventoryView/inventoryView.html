@@ -88,14 +88,14 @@
                         <div key={p.Id} class="detail-card">
                             <div class="dc-top">
                                 <div class="dc-num">
-                                    {p.Purchase__r.Name}
+                                    {p.purchaseName}
                                 </div>
                                 <div class={p.deliveryClass}>
-                                    {p.Purchase__r.Delivery_Status__c}
+                                    {p.deliveryStatusLabel}
                                 </div>
                             </div>
                             <div class="dc-meta">
-                                {p.Purchase__r.Supplier__r.Name}
+                                {p.supplierName}
                                 &middot; {p.formattedDate}
                             </div>
                             <div class="dc-row">
@@ -139,14 +139,14 @@
                         <div key={s.Id} class="detail-card">
                             <div class="dc-top">
                                 <div class="dc-num">
-                                    {s.Sale__r.Name}
+                                    {s.saleName}
                                 </div>
                                 <div class="dc-profit">
                                     +&#8377;{s.formattedProfit}
                                 </div>
                             </div>
                             <div class="dc-meta">
-                                {s.Sale__r.Client__r.Name}
+                                {s.clientName}
                                 &middot; {s.formattedDate}
                             </div>
                             <div class="dc-row">
