@@ -90,16 +90,14 @@ public with sharing class AccountClientController {
     }
 
     // Toggle whether this client receives the automated WhatsApp order
-    // follow-up (Wed/Sun, 21+ days no order). Kept separate from the
-    // notes/history save above so flipping the switch is a one-field update.
+    // follow-up (Wed/Sun, 21+ days no order). One-field update.
     @AuraEnabled
     public static void saveSendOrderFollowUp(Id accountId, Boolean enabled) {
         update new Account(Id = accountId, Send_Order_FollowUp__c = enabled);
     }
 
-    // One-time backfill: a newly-added checkbox leaves EXISTING records at
-    // false, so set every current Client to ON (default) so nobody is
-    // silently opted out. Safe to re-run — only touches records still false.
+    // One-time / restore backfill: set every Client's WhatsApp follow-up ON.
+    // Safe to re-run — only touches records currently false.
     public static Integer backfillOrderFollowUpDefaults() {
         List<Account> toFix = [
             SELECT Id FROM Account
@@ -140,6 +138,43 @@ public with sharing class AccountClientController {
         a.Follow_Up_Notes__c = notes; // current notes (for next pre-fill)
 
         update a;
+    }
+
+    // ── TEST-SAFETY HELPER ─────────────────────────────────────────────────
+    // Turns the WhatsApp order follow-up OFF for every Client except keepId
+    // (which is forced ON), then returns the resulting ON-list so the change
+    // can be verified before any message is sent. Used to isolate a single
+    // test recipient in production.
+    public static Map<String, Object> disableAllClientFollowUpsExcept(Id keepId) {
+        List<Account> clients = [
+            SELECT Id, Name, Send_Order_FollowUp__c
+            FROM Account
+            WHERE RecordType.Name = 'Client'
+        ];
+        List<Account> toUpdate = new List<Account>();
+        for (Account a : clients) {
+            Boolean shouldBeOn = (a.Id == keepId);
+            if (a.Send_Order_FollowUp__c != shouldBeOn) {
+                a.Send_Order_FollowUp__c = shouldBeOn;
+                toUpdate.add(a);
+            }
+        }
+        if (!toUpdate.isEmpty()) update toUpdate;
+
+        List<String> stillOn = new List<String>();
+        for (Account a : [
+            SELECT Name FROM Account
+            WHERE RecordType.Name = 'Client'
+            AND Send_Order_FollowUp__c = true
+            ORDER BY Name
+        ]) {
+            stillOn.add(a.Name);
+        }
+        return new Map<String, Object>{
+            'recordsChanged' => toUpdate.size(),
+            'stillOnCount'   => stillOn.size(),
+            'stillOnNames'   => stillOn
+        };
     }
 
 }

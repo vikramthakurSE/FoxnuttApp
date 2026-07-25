@@ -2,10 +2,9 @@
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>Send_Order_FollowUp__c</fullName>
     <defaultValue>true</defaultValue>
-    <description>When on, this client receives the automated 21-day "no order" WhatsApp follow-up (with the Re-order/Call Us button) on Wednesdays and Sundays. Turn off to stop those WhatsApp messages for clients who are not interested — internal team reminders are unaffected.</description>
-    <externalId>false</externalId>
+    <description>When on, this client receives the automated 21-day &quot;no order&quot; WhatsApp follow-up (with the Re-order/Call Us button) on Wednesdays and Sundays. Turn off to stop those WhatsApp messages for clients who are not interested — internal team reminders are unaffected.</description>
     <inlineHelpText>On = send WhatsApp order follow-ups to this client. Off = never send them.</inlineHelpText>
     <label>Send WhatsApp Follow-Ups</label>
-    <trackTrending>false</trackTrending>
+    <trackFeedHistory>false</trackFeedHistory>
     <type>Checkbox</type>
 </CustomField>
