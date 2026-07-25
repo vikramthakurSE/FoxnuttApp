@@ -75,7 +75,8 @@ public with sharing class AccountClientController {
             SELECT Id, Follow_Up__c,
                    Follow_Up_Date__c,
                    Follow_Up_Notes__c,
-                   Follow_Up_History__c
+                   Follow_Up_History__c,
+                   Send_Order_FollowUp__c
             FROM Account WHERE Id = :accountId LIMIT 1
         ];
         return new Map<String, Object>{
@@ -83,8 +84,31 @@ public with sharing class AccountClientController {
             'followUpDate'  => a.Follow_Up_Date__c != null
                                ? String.valueOf(a.Follow_Up_Date__c) : null,
             'followUpNotes' => a.Follow_Up_Notes__c,
-            'followUpHistory' => a.Follow_Up_History__c
+            'followUpHistory' => a.Follow_Up_History__c,
+            'sendOrderFollowUp' => a.Send_Order_FollowUp__c
         };
+    }
+
+    // Toggle whether this client receives the automated WhatsApp order
+    // follow-up (Wed/Sun, 21+ days no order). Kept separate from the
+    // notes/history save above so flipping the switch is a one-field update.
+    @AuraEnabled
+    public static void saveSendOrderFollowUp(Id accountId, Boolean enabled) {
+        update new Account(Id = accountId, Send_Order_FollowUp__c = enabled);
+    }
+
+    // One-time backfill: a newly-added checkbox leaves EXISTING records at
+    // false, so set every current Client to ON (default) so nobody is
+    // silently opted out. Safe to re-run — only touches records still false.
+    public static Integer backfillOrderFollowUpDefaults() {
+        List<Account> toFix = [
+            SELECT Id FROM Account
+            WHERE RecordType.Name = 'Client'
+            AND Send_Order_FollowUp__c = false
+        ];
+        for (Account a : toFix) a.Send_Order_FollowUp__c = true;
+        if (!toFix.isEmpty()) update toFix;
+        return toFix.size();
     }
 
     @AuraEnabled

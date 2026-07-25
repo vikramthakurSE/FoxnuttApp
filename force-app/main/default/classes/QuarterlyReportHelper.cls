@@ -1,5 +1,15 @@
 public class QuarterlyReportHelper {
 
+    // ── Manual "run now" for the quarter currently in progress ─────────────
+    // The scheduled job reports the quarter that just ended; use this to
+    // e-mail the CURRENT quarter's numbers on demand at any time:
+    //   QuarterlyReportHelper.sendCurrentQuarterReport();
+    public static void sendCurrentQuarterReport() {
+        Date today   = Date.today();
+        Integer qNum = (Integer) Math.ceil(today.month() / 3.0);
+        sendQuarterlyReportForQuarter('Qtr' + qNum + '_' + today.year());
+    }
+
     // ── Entry point called by scheduler ───────────────────────────────────
     public static void sendQuarterlyReport() {
         // Determine which quarter just ended
@@ -132,7 +142,7 @@ public class QuarterlyReportHelper {
         m.put('activeClients',
             Integer.valueOf(clientAR.get('activeClients')));
 
-        // Outstanding as of today
+        // Outstanding as of today (all-time, across every open sale)
         AggregateResult outAR = [
             SELECT SUM(Balance_Due__c) total
             FROM Sale__c
@@ -142,6 +152,21 @@ public class QuarterlyReportHelper {
         Decimal totalOutstanding = (Decimal) outAR.get('total');
         m.put('totalOutstandingNow',
             totalOutstanding != null ? totalOutstanding : 0);
+
+        // Client payment still pending on THIS quarter's sales — so the
+        // report shows what's owed for the quarter it's reporting on, not
+        // just the running company-wide figure
+        AggregateResult qOutAR = [
+            SELECT SUM(Balance_Due__c) total
+            FROM Sale__c
+            WHERE Sale_Date__c >= :startDate
+            AND   Sale_Date__c <= :endDate
+            AND   Order_Status__c != 'Cancelled'
+            AND   Balance_Due__c > 0
+        ];
+        Decimal qOutstanding = (Decimal) qOutAR.get('total');
+        m.put('quarterClientOutstanding',
+            qOutstanding != null ? qOutstanding : 0);
 
         // Top 3 clients by revenue this quarter
         List<AggregateResult> topClients = [
@@ -189,13 +214,15 @@ public class QuarterlyReportHelper {
         ];
         m.put('teamPerf', teamPerf);
 
-        // Team collections
+        // Team collections — attributed to the quarter the SALE was made
+        // (not the payment date), consistent with the Person Funds tab so
+        // cash collected late still counts toward the quarter that earned it
         List<AggregateResult> teamCollections = [
             SELECT Accepted_By__c collector,
                    SUM(Amount__c) collected
             FROM Client_Payment__c
-            WHERE Payment_Date__c >= :startDate
-            AND   Payment_Date__c <= :endDate
+            WHERE Sale__r.Sale_Date__c >= :startDate
+            AND   Sale__r.Sale_Date__c <= :endDate
             AND   Accepted_By__c != null
             GROUP BY Accepted_By__c
             ORDER BY SUM(Amount__c) DESC
@@ -244,6 +271,35 @@ public class QuarterlyReportHelper {
             invAR.get('remaining') != null ? invAR.get('remaining') : 0);
         m.put('invBrands',
             Integer.valueOf(invAR.get('brands')));
+
+        // Inventory value at cost (SOQL can't multiply two fields, so sum in
+        // Apex). Uses the current live snapshot — we don't store historical
+        // inventory, so this is closing stock as the turnover denominator.
+        Decimal invValue = 0;
+        for (Inventory__c inv : [
+            SELECT Remaining_Quantity__c, Avg_Cost_Per_Kg__c
+            FROM Inventory__c
+        ]) {
+            Decimal rem  = inv.Remaining_Quantity__c != null
+                           ? inv.Remaining_Quantity__c : 0;
+            Decimal cost = inv.Avg_Cost_Per_Kg__c != null
+                           ? inv.Avg_Cost_Per_Kg__c : 0;
+            invValue += rem * cost;
+        }
+        m.put('invValue', invValue);
+
+        // Inventory turnover for the quarter = COGS / closing inventory value.
+        // COGS = revenue - profit (the cost baked into what was sold), which
+        // keeps it consistent with the revenue/profit shown elsewhere.
+        Decimal cogs = revenue - profit;
+        m.put('cogs', cogs);
+        Decimal turnover = invValue > 0 ? cogs / invValue : 0;
+        m.put('invTurnover', turnover);
+
+        // Days of inventory on hand across the quarter's length
+        Integer daysInQuarter = startDate.daysBetween(endDate) + 1;
+        m.put('invDaysOnHand',
+            turnover > 0 ? (Decimal) daysInQuarter / turnover : 0);
 
         // ── 7. Cash flow ───────────────────────────────────────────────────
         AggregateResult expAR = [
@@ -423,7 +479,7 @@ public class QuarterlyReportHelper {
         '<tr><td style="padding:12px 36px 0;">' +
         twoCol(
             statBox('Active Clients', String.valueOf(activeClients), '#f59e0b', '#1f2937') +
-            statBox('Outstanding Due', '₹'+fmtCr((Decimal)m.get('totalOutstandingNow')), '#f87171', '#1f2937'),
+            statBox('Pending from Clients (This Qtr)', '₹'+fmtCr((Decimal)m.get('quarterClientOutstanding')), '#f87171', '#1f2937'),
             statBox('Collection Rate', collRate.setScale(0)+'%', '#4ade80', '#1f2937') +
             statBox('Orders Delivered', String.valueOf((Integer)m.get('deliveredCount')), '#38bdf8', '#1f2937')
         ) +
@@ -478,6 +534,28 @@ public class QuarterlyReportHelper {
                 new List<String>{'Remaining Inventory (live)', fmtN((Decimal)m.get('invRemaining'))+' KG'}
             }
         ) +
+        '</td></tr>' +
+
+        // ── Section: Inventory Turnover ────────────────────────────────────
+        '<tr><td style="padding:24px 36px 0;">' +
+        sectionTitle('🔄 Inventory Turnover') +
+        '</td></tr>' +
+        '<tr><td style="padding:12px 36px 0;">' +
+        twoCol(
+            statBox('Turnover Ratio',
+                ((Decimal)m.get('invTurnover')).setScale(2)+'x', '#f59e0b', '#1f2937') +
+            statBox('Days of Inventory on Hand',
+                ((Decimal)m.get('invDaysOnHand')).setScale(0)+' days', '#38bdf8', '#1f2937'),
+            statBox('Cost of Goods Sold (Qtr)',
+                '₹'+fmtCr((Decimal)m.get('cogs')), '#f87171', '#1f2937') +
+            statBox('Closing Inventory (at cost)',
+                '₹'+fmtCr((Decimal)m.get('invValue')), '#a78bfa', '#1f2937')
+        ) +
+        '<div style="font-size:11px;color:#6b7280;padding:6px 2px 0;line-height:1.6;">' +
+        'Turnover = cost of goods sold this quarter ÷ current stock value. ' +
+        'Higher means stock is selling through faster; days-on-hand is how long ' +
+        'current stock lasts at this quarter\'s pace.' +
+        '</div>' +
         '</td></tr>' +
 
         // ── Section: Cash Flow ─────────────────────────────────────────────

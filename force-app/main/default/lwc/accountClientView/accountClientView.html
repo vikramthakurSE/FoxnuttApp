@@ -304,6 +304,18 @@
                 </template>
             </div>
 
+            <!-- WhatsApp follow-up opt-out (client-facing reminders) -->
+            <button class={waToggleClass}
+                onclick={toggleSendOrderFollowUp}
+                disabled={isWaToggleSaving}>
+                <span class="wa-toggle-dot"></span>
+                <span class="wa-toggle-text">{waToggleLabel}</span>
+            </button>
+            <div class="wa-toggle-hint">
+                Automated 21-day "no order" reminder sent to this client on
+                WhatsApp (Wed &amp; Sun). Turn off to stop it.
+            </div>
+
             <!-- Notes input -->
             <textarea class="followup-notes"
                 placeholder="Add notes from client conversation..."

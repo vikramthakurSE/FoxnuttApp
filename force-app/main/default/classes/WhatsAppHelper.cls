@@ -78,6 +78,47 @@ public class WhatsAppHelper {
         });
     }
 
+    /** Same as buildPayload, but for templates whose approved header is an
+     *  IMAGE — the API rejects the send otherwise (error 132012, format
+     *  mismatch) even though the body parameters are correct. */
+    private static String buildPayloadWithImageHeader(
+        String to, String templateName, String headerImageUrl, List<String> params
+    ) {
+        List<Object> parameters = new List<Object>();
+        for (String p : params) {
+            parameters.add(new Map<String, Object>{
+                'type' => 'text',
+                'text' => (p != null ? p : '-')
+            });
+        }
+        return JSON.serialize(new Map<String, Object>{
+            'messaging_product' => 'whatsapp',
+            'to'   => to,
+            'type' => 'template',
+            'template' => new Map<String, Object>{
+                'name'     => templateName,
+                'language' => new Map<String, Object>{ 'code' => 'en_US' },
+                'components' => new List<Object>{
+                    new Map<String, Object>{
+                        'type'       => 'header',
+                        'parameters' => new List<Object>{
+                            new Map<String, Object>{
+                                'type'  => 'image',
+                                'image' => new Map<String, Object>{
+                                    'link' => headerImageUrl
+                                }
+                            }
+                        }
+                    },
+                    new Map<String, Object>{
+                        'type'       => 'body',
+                        'parameters' => parameters
+                    }
+                }
+            }
+        });
+    }
+
     // ════════════════════════════════════════════════════════════════════════
     // 1. WELCOME — new client account created
     // Template: welcome_new_client  |  {{1}} = client name
@@ -174,9 +215,16 @@ public class WhatsAppHelper {
 
     // ════════════════════════════════════════════════════════════════════════
     // 7. ORDER FOLLOW-UP REMINDER (21+ days no order)
-    // Template: order_followup_reminder
+    // Template: order_followup_reminder — approved with an IMAGE header
     // {{1}} name, {{2}} last order date, {{3}} stock + prices block
     // ════════════════════════════════════════════════════════════════════════
+    // TODO: Google Drive hotlinking is not reliable for an automated send —
+    // Meta's fetcher can be rate-limited or blocked by Drive's abuse
+    // detection. Move this to a permanent host (Meta's own /media upload,
+    // or a static file host) when convenient.
+    private static final String FOLLOWUP_HEADER_IMAGE_URL =
+        'https://drive.google.com/uc?export=download&id=1vJpyG9QHyTJLLZ6P96zT7G3I6W6ODGd7';
+
     @future(callout=true)
     public static void sendOrderFollowUp(
         String phone, String clientName,
@@ -184,7 +232,8 @@ public class WhatsAppHelper {
     ) {
         String p = fmtPhone(phone);
         if (p == null) return;
-        sendMessage(buildPayload(p, 'order_followup_reminder',
+        sendMessage(buildPayloadWithImageHeader(
+            p, 'order_followup_reminder', FOLLOWUP_HEADER_IMAGE_URL,
             new List<String>{ clientName, lastOrderDate, stockBlock }));
     }
 
@@ -310,23 +359,23 @@ public class WhatsAppHelper {
     ) {
         if (String.isBlank(phone)) return;
 
-        // Build stock block from available inventory
-        String stockBlock = '';
+        // Brand names only — no price, no stock quantity. Prices vary per
+        // client, so quoting one figure over WhatsApp would be misleading.
+        Set<String> brandSet = new Set<String>();
         for (Inventory__c inv : [
-            SELECT Brand__c, Packet_Type__c,
-                   Selling_Price__c, Remaining_Quantity__c
+            SELECT Brand__c
             FROM Inventory__c
             WHERE Remaining_Quantity__c > 0
             AND   Selling_Price__c != null
-            ORDER BY Brand__c, Packet_Type__c
+            ORDER BY Brand__c
         ]) {
-            stockBlock +=
-                inv.Brand__c + ' (' + inv.Packet_Type__c + ')' +
-                ' - ' + inv.Selling_Price__c.setScale(0) + '/kg' +
-                ' (' + inv.Remaining_Quantity__c.setScale(0) + ' KG)\n';
+            brandSet.add(inv.Brand__c);
         }
-        if (String.isBlank(stockBlock))
-            stockBlock = 'Fresh stock available. Contact us for details.';
+        List<String> brandNames = new List<String>(brandSet);
+        brandNames.sort();
+        String stockBlock = brandNames.isEmpty()
+            ? 'Fresh stock available. Contact us for details.'
+            : String.join(brandNames, ' | ');
 
         // Trim to fit WA limit
         if (stockBlock.length() > 300)
