@@ -22,7 +22,7 @@ public class FollowUpNotificationHelper {
 
         Set<Id> clientIds = data.lastSaleByClient.keySet();
         Map<Id, Account> accountMap = new Map<Id, Account>([
-            SELECT Id, Follow_Up__c
+            SELECT Id, Follow_Up__c, Send_Order_FollowUp__c
             FROM Account
             WHERE Id IN :clientIds
         ]);
@@ -183,6 +183,14 @@ public class FollowUpNotificationHelper {
         ClientDeliveryData data,
         Map<Id, Account> accountMap
     ) {
+        // WhatsApp (order_followup_reminder) only goes out Wednesday &
+        // Sunday — push notifications still fire every day below.
+        String dayName = Datetime.newInstance(
+            today, Time.newInstance(0, 0, 0, 0)
+        ).format('EEEE');
+        Boolean sendWhatsAppToday =
+            dayName == 'Wednesday' || dayName == 'Sunday';
+
         Set<Id> eligibleSaleIds = new Set<Id>();
         List<Sale__c> toNotify = new List<Sale__c>();
 
@@ -241,6 +249,17 @@ public class FollowUpNotificationHelper {
                 notif.send(recipientIds);
             } catch (Exception e) {
                 System.debug('Follow-up failed: ' + e.getMessage());
+            }
+
+            // Per-client opt-out: only WhatsApp clients who still have
+            // "Send WhatsApp Follow-Ups" turned on (default on)
+            Account acc = accountMap.get(s.Client__c);
+            Boolean followUpOn = acc == null || acc.Send_Order_FollowUp__c;
+            if (sendWhatsAppToday && followUpOn
+                    && String.isNotBlank(s.Client__r.Phone)) {
+                WhatsAppHelper.dispatchOrderFollowUp(
+                    s.Client__r.Phone, s.Client__r.Name, dateStr
+                );
             }
         }
     }

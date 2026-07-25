@@ -261,14 +261,16 @@ public with sharing class PersonFundsController {
     public static List<String> getAvailableQuarters() {
         Set<String> quarters = new Set<String>();
 
-        // From client payments
+        // From client payments — bucketed by the related Sale's date, not the
+        // payment date, so cash collected late still counts in the quarter the
+        // sale was made (mirrors the manufacturer-payment rule below)
         for (AggregateResult ar : [
-            SELECT CALENDAR_YEAR(Payment_Date__c) yr,
-                   CALENDAR_MONTH(Payment_Date__c) mo
+            SELECT CALENDAR_YEAR(Sale__r.Sale_Date__c) yr,
+                   CALENDAR_MONTH(Sale__r.Sale_Date__c) mo
             FROM Client_Payment__c
-            WHERE Payment_Date__c != null
-            GROUP BY CALENDAR_YEAR(Payment_Date__c),
-                     CALENDAR_MONTH(Payment_Date__c)
+            WHERE Sale__r.Sale_Date__c != null
+            GROUP BY CALENDAR_YEAR(Sale__r.Sale_Date__c),
+                     CALENDAR_MONTH(Sale__r.Sale_Date__c)
         ]) {
             Integer yr = (Integer) ar.get('yr');
             Integer mo = (Integer) ar.get('mo');
@@ -313,12 +315,23 @@ public with sharing class PersonFundsController {
         Integer curQ = (Integer) Math.ceil(today.month() / 3.0);
         quarters.add('Qtr' + curQ + '_' + today.year());
 
-        // Sort descending (newest first)
-        List<String> sorted = new List<String>(quarters);
-        sorted.sort();
+        // Sort newest first by (year, quarter). A plain string sort ordered
+        // "Qtr4_2025" ahead of "Qtr3_2026" because it compared the quarter
+        // digit before the year — so sort on a numeric key year*10+quarter.
+        Map<Integer, String> keyToLabel = new Map<Integer, String>();
+        List<Integer> keys = new List<Integer>();
+        for (String qs : quarters) {
+            List<String> p = qs.split('_');
+            Integer q   = Integer.valueOf(p[0].replace('Qtr', ''));
+            Integer y   = Integer.valueOf(p[1]);
+            Integer key = y * 10 + q;
+            keyToLabel.put(key, qs);
+            keys.add(key);
+        }
+        keys.sort();
         List<String> result = new List<String>();
-        for (Integer i = sorted.size() - 1; i >= 0; i--) {
-            result.add(sorted[i]);
+        for (Integer i = keys.size() - 1; i >= 0; i--) {
+            result.add(keyToLabel.get(keys[i]));
         }
         return result;
     }
@@ -337,14 +350,16 @@ public with sharing class PersonFundsController {
         Date qStart = Date.newInstance(yr, startMonth, 1);
         Date qEnd   = qStart.addMonths(3).addDays(-1);
 
-        // Per-person collected
+        // Per-person collected — attributed to the quarter the SALE was made
+        // (Sale__r.Sale_Date__c), not when the cash arrived, so a payment
+        // collected late still counts toward the quarter that earned it
         Map<String, Decimal> collected = new Map<String, Decimal>();
         for (AggregateResult ar : [
             SELECT Accepted_By__c person, SUM(Amount__c) total
             FROM Client_Payment__c
             WHERE Accepted_By__c != null
-            AND Payment_Date__c >= :qStart
-            AND Payment_Date__c <= :qEnd
+            AND Sale__r.Sale_Date__c >= :qStart
+            AND Sale__r.Sale_Date__c <= :qEnd
             GROUP BY Accepted_By__c
         ]) {
             Decimal amt = (Decimal) ar.get('total');
@@ -398,14 +413,15 @@ public with sharing class PersonFundsController {
         for (Decimal v : mfrPaid.values())   teamMfrPaid   += v;
         for (Decimal v : expenses.values())  teamExpenses  += v;
 
-        // Recent transactions for this quarter
+        // Recent transactions for this quarter — client payments listed under
+        // the quarter of their sale (same rule as the collected total above)
         List<Client_Payment__c> recentPayments = [
             SELECT Id, Amount__c, Payment_Date__c,
                    Mode_of_Payment__c, Accepted_By__c,
                    Sale__r.Name, Sale__r.Client__r.Name
             FROM Client_Payment__c
-            WHERE Payment_Date__c >= :qStart
-            AND Payment_Date__c <= :qEnd
+            WHERE Sale__r.Sale_Date__c >= :qStart
+            AND Sale__r.Sale_Date__c <= :qEnd
             ORDER BY Payment_Date__c DESC
             LIMIT 50
         ];

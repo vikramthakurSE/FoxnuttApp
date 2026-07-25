@@ -318,6 +318,48 @@
     font-size: 11px;
     color: #9ca3af;
 }
+/* WhatsApp follow-up opt-out toggle */
+.wa-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border: 1.5px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 11px 14px;
+    font-size: 13px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    box-sizing: border-box;
+    margin-bottom: 6px;
+    transition: all .15s;
+}
+.wa-toggle-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.wa-toggle-on {
+    background: #ecfdf5;
+    border-color: #6ee7b7;
+    color: #047857;
+}
+.wa-toggle-on .wa-toggle-dot { background: #10b981; }
+.wa-toggle-off {
+    background: #f3f4f6;
+    border-color: #e5e7eb;
+    color: #6b7280;
+}
+.wa-toggle-off .wa-toggle-dot { background: #9ca3af; }
+.wa-toggle-hint {
+    font-size: 10.5px;
+    color: #9ca3af;
+    line-height: 1.4;
+    margin-bottom: 12px;
+}
+
 .followup-notes {
     width: 100%;
     border: 1.5px solid #e5e7eb;

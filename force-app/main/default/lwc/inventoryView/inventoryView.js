@@ -154,6 +154,7 @@ export default class InventoryView extends LightningElement {
         this.shrinkValue = e.target.dataset.shrink || '0';
         this.shrinkError = '';
         this.isShrinkOpen = true;
+        this._scrollToTop();
     }
 
     closeShrink()     { this.isShrinkOpen = false; }
@@ -226,6 +227,7 @@ export default class InventoryView extends LightningElement {
         this.isDetailLoading = true;
         this.detailPurchases = [];
         this.detailSales     = [];
+        this._scrollToTop();
 
         getBrandDetail({
             brand:      this.detailBrand,
@@ -234,9 +236,16 @@ export default class InventoryView extends LightningElement {
         .then(data => {
             this.isDetailLoading = false;
 
+            // Purchase__r / Sale__r (and their nested Supplier__r / Client__r)
+            // can be null when the parent record has no supplier/client set —
+            // flatten with fallbacks here so the template never dereferences
+            // undefined (that was freezing the modal for some brands).
             this.detailPurchases = (data.purchases || []).map(p => ({
                 ...p,
-                formattedDate: p.Purchase__r.Order_Date__c
+                purchaseName: p.Purchase__r?.Name || '—',
+                supplierName: p.Purchase__r?.Supplier__r?.Name || 'Unknown Supplier',
+                deliveryStatusLabel: p.Purchase__r?.Delivery_Status__c || '—',
+                formattedDate: p.Purchase__r?.Order_Date__c
                     ? new Date(p.Purchase__r.Order_Date__c + 'T00:00:00')
                         .toLocaleDateString('en-IN', {
                             day: '2-digit', month: 'short',
@@ -245,7 +254,7 @@ export default class InventoryView extends LightningElement {
                     : '—',
                 formattedTotal: (p.Line_Total__c || 0).toFixed(2),
                 deliveryClass: this.getDeliveryClass(
-                    p.Purchase__r.Delivery_Status__c
+                    p.Purchase__r?.Delivery_Status__c
                 )
             }));
 
@@ -263,7 +272,9 @@ export default class InventoryView extends LightningElement {
 
                 return {
                     ...s,
-                    formattedDate: s.Sale__r.Sale_Date__c
+                    saleName:  s.Sale__r?.Name || '—',
+                    clientName: s.Sale__r?.Client__r?.Name || 'Unknown Client',
+                    formattedDate: s.Sale__r?.Sale_Date__c
                         ? new Date(s.Sale__r.Sale_Date__c + 'T00:00:00')
                             .toLocaleDateString('en-IN', {
                                 day: '2-digit', month: 'short',
@@ -281,6 +292,12 @@ export default class InventoryView extends LightningElement {
     }
 
     closeDetail() { this.isDetailOpen = false; }
+
+    _scrollToTop() {
+        try {
+            window.scrollTo(0, 0);
+        } catch (e) { /* silent */ }
+    }
 
     getDeliveryClass(status) {
         if (status === 'Received')         return 'dc-status green';

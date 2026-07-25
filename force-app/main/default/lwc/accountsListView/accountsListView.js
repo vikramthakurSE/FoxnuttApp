@@ -63,7 +63,16 @@ export default class AccountsListView extends NavigationMixin(
             let deliveryDateLabel = null;
             let deliveryIsToday   = false;
             let deliveryIsTomorrow = false;
-            if (c.upcomingDeliveryDate) {
+            let deliveryIsDelayed = false;
+            if (c.delayedDeliveryDate) {
+                // Overdue takes priority over any upcoming date
+                const d     = new Date(c.delayedDeliveryDate + 'T00:00:00');
+                const today = new Date(); today.setHours(0,0,0,0);
+                const daysLate = Math.round((today - d) / (1000 * 60 * 60 * 24));
+                deliveryIsDelayed = true;
+                deliveryDateLabel = 'Delivery Delayed' +
+                    (daysLate > 0 ? ' · ' + daysLate + 'd' : '');
+            } else if (c.upcomingDeliveryDate) {
                 const d     = new Date(c.upcomingDeliveryDate + 'T00:00:00');
                 const today = new Date(); today.setHours(0,0,0,0);
                 const diff  = Math.round((d - today) / (1000 * 60 * 60 * 24));
@@ -82,19 +91,24 @@ export default class AccountsListView extends NavigationMixin(
             const showClear = !hasActiveOrders && !hasBalance;
 
             // Card border colour priority:
-            // amber = out for delivery, blue = confirmed, orange = due, green = clear
+            // red = delayed, amber = out for delivery, blue = confirmed, orange = due, green = clear
             let cardClass = 'client-card card-clear';
-            if (hasOutForDelivery)     cardClass = 'client-card card-transit';
+            if (deliveryIsDelayed)     cardClass = 'client-card card-delayed';
+            else if (hasOutForDelivery) cardClass = 'client-card card-transit';
             else if (hasConfirmed)     cardClass = 'client-card card-confirmed';
             else if (hasBalance)       cardClass = 'client-card card-has-balance';
 
-            // Sort weight: lower = higher in list
-            let sortWeight = 4; // clear
-            if (hasOutForDelivery && hasBalance) sortWeight = 0;
-            else if (hasOutForDelivery)          sortWeight = 1;
-            else if (hasConfirmed && hasBalance) sortWeight = 2;
-            else if (hasBalance)                 sortWeight = 3;
-            else if (hasConfirmed)               sortWeight = 3;
+            // Sort weight: lower = higher in list. Delayed deliveries are
+            // the most urgent state — always float to the very top.
+            // Confirmed orders (even with ₹0 balance, since balance only
+            // counts delivered sales) rank above plain balance-due clients.
+            let sortWeight = 5; // clear
+            if (deliveryIsDelayed)                    sortWeight = -1;
+            else if (hasOutForDelivery && hasBalance) sortWeight = 0;
+            else if (hasOutForDelivery)               sortWeight = 1;
+            else if (hasConfirmed && hasBalance)      sortWeight = 2;
+            else if (hasConfirmed)                    sortWeight = 3;
+            else if (hasBalance)                      sortWeight = 4;
 
             return {
                 ...c,
@@ -107,7 +121,9 @@ export default class AccountsListView extends NavigationMixin(
                 deliveryDateLabel,
                 deliveryIsToday,
                 deliveryIsTomorrow,
-                deliveryDateClass: deliveryIsToday    ? 'delivery-badge urgent'
+                deliveryIsDelayed,
+                deliveryDateClass: deliveryIsDelayed  ? 'delivery-badge delayed'
+                                 : deliveryIsToday    ? 'delivery-badge urgent'
                                  : deliveryIsTomorrow ? 'delivery-badge soon'
                                  : deliveryDateLabel  ? 'delivery-badge normal'
                                  : '',
