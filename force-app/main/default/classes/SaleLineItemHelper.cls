@@ -262,6 +262,35 @@ public class SaleLineItemHelper {
     }
 
     // ════════════════════════════════════════════════════════════════════════
+    // Called from SaleTrigger BEFORE DELETE.
+    // A Sale_Line_Item is master-detail on Sale, so deleting a Sale cascade-
+    // deletes its line items WITHOUT firing the line-item delete trigger —
+    // meaning a deleted Delivered sale would never return its stock. Handle
+    // that here. (Deleting a line item on its own still goes through onDelete.)
+    // ════════════════════════════════════════════════════════════════════════
+    public static void onSaleDelete(List<Sale__c> oldSales) {
+        Set<Id> deliveredSaleIds = new Set<Id>();
+        for (Sale__c s : oldSales) {
+            if (s.Order_Status__c == 'Delivered') deliveredSaleIds.add(s.Id);
+        }
+        if (deliveredSaleIds.isEmpty()) return;
+
+        Map<String, Decimal> returns = new Map<String, Decimal>();
+        for (Sale_Line_Item__c li : [
+            SELECT Brand__c, Packet_Type__c, Quantity__c
+            FROM Sale_Line_Item__c
+            WHERE Sale__c IN :deliveredSaleIds
+        ]) {
+            if (li.Brand__c == null || li.Quantity__c == null) continue;
+            String key = li.Brand__c + '|' + li.Packet_Type__c;
+            returns.put(key,
+                (returns.containsKey(key) ? returns.get(key) : 0)
+                + li.Quantity__c);
+        }
+        if (!returns.isEmpty()) applyReturn(returns);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
     // PRIVATE HELPERS
     // ════════════════════════════════════════════════════════════════════════
 

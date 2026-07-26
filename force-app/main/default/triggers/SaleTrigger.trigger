@@ -1,7 +1,14 @@
-trigger SaleTrigger on Sale__c (after insert, after update) {
+trigger SaleTrigger on Sale__c (after insert, after update, before delete) {
 
     // New sale WhatsApp + notification fired from SaleLineItemHelper.onInsert
     // (line items needed for product details)
+
+    // BEFORE DELETE — return stock for a deleted Delivered sale. Cascade
+    // delete of its line items does NOT fire their trigger, so we must
+    // return inventory here (line items still exist at before-delete time).
+    if (Trigger.isBefore && Trigger.isDelete) {
+        SaleLineItemHelper.onSaleDelete(Trigger.old);
+    }
 
     if (Trigger.isAfter && Trigger.isUpdate) {
 
