@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Shrinkage_Notes__c</fullName>
+    <label>Shrinkage Notes</label>
+    <type>LongTextArea</type>
+    <length>1000</length>
+    <visibleLines>3</visibleLines>
+    <description>Reason / remarks for the recorded shrinkage on this brand (e.g. moisture loss, damaged packets, samples given).</description>
+    <inlineHelpText>Why was this stock lost? e.g. moisture, damaged packets, samples.</inlineHelpText>
+    <trackTrending>false</trackTrending>
+</CustomField>

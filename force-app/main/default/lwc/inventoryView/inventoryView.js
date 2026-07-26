@@ -141,6 +141,7 @@ export default class InventoryView extends LightningElement {
     @track shrinkType     = '';
     @track shrinkId       = '';
     @track shrinkValue    = '';
+    @track shrinkNotes    = '';
     @track shrinkError    = '';
 
     get shrinkSaveLabel() {
@@ -152,6 +153,9 @@ export default class InventoryView extends LightningElement {
         this.shrinkBrand = e.target.dataset.brand;
         this.shrinkType  = e.target.dataset.type;
         this.shrinkValue = e.target.dataset.shrink || '0';
+        // dataset.notes is the string "undefined"/"null"/"" when unset
+        const n = e.target.dataset.notes;
+        this.shrinkNotes = (n && n !== 'undefined' && n !== 'null') ? n : '';
         this.shrinkError = '';
         this.isShrinkOpen = true;
         this._scrollToTop();
@@ -159,6 +163,7 @@ export default class InventoryView extends LightningElement {
 
     closeShrink()     { this.isShrinkOpen = false; }
     onShrinkVal(e)    { this.shrinkValue  = e.target.value; }
+    onShrinkNotes(e)  { this.shrinkNotes  = e.target.value; }
 
     saveShrinkage() {
         this.shrinkError = '';
@@ -171,7 +176,8 @@ export default class InventoryView extends LightningElement {
 
         updateShrinkage({
             inventoryId: this.shrinkId,
-            shrinkage:   val
+            shrinkage:   val,
+            notes:       this.shrinkNotes || ''
         })
         .then(() => {
             this.isShrinkSaving = false;

@@ -26,6 +26,14 @@
                         placeholder="0.00"
                         onchange={onShrinkVal}>
                 </div>
+                <div class="form-group">
+                    <label class="form-label">Reason / Remarks</label>
+                    <textarea class="form-input"
+                        value={shrinkNotes}
+                        onchange={onShrinkNotes}
+                        rows="3"
+                        placeholder="e.g. moisture loss, damaged packets, samples given"></textarea>
+                </div>
                 <template if:true={shrinkError}>
                     <div class="form-error">&#9888; {shrinkError}</div>
                 </template>
@@ -340,6 +348,7 @@
                                 data-brand={inv.Brand__c}
                                 data-type={inv.Packet_Type__c}
                                 data-shrink={inv.Shrinkage__c}
+                                data-notes={inv.Shrinkage_Notes__c}
                                 onclick={openShrink}>
                                 Shrinkage
                             </button>

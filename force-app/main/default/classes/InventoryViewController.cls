@@ -7,7 +7,7 @@ public with sharing class InventoryViewController {
             SELECT Id, Name, Brand__c, Packet_Type__c,
                    Total_Quantity__c, Remaining_Quantity__c,
                    Quantity_Sold__c, Avg_Cost_Per_Kg__c,
-                   Packet_Count__c, Shrinkage__c,
+                   Packet_Count__c, Shrinkage__c, Shrinkage_Notes__c,
                    Last_Purchase_Date__c
             FROM Inventory__c
             ORDER BY Remaining_Quantity__c DESC NULLS LAST,
@@ -94,7 +94,7 @@ public with sharing class InventoryViewController {
 
     @AuraEnabled
     public static void updateShrinkage(
-        Id inventoryId, Decimal shrinkage
+        Id inventoryId, Decimal shrinkage, String notes
     ) {
         // Re-query to get current totals so we can
         // correctly compute Remaining and Packet_Count
@@ -117,6 +117,7 @@ public with sharing class InventoryViewController {
         update new Inventory__c(
             Id                    = inventoryId,
             Shrinkage__c          = shrink,
+            Shrinkage_Notes__c    = String.isBlank(notes) ? null : notes.trim(),
             Remaining_Quantity__c = remaining
         );
     }
