@@ -140,25 +140,55 @@ export default class InventoryView extends LightningElement {
     @track shrinkBrand    = '';
     @track shrinkType     = '';
     @track shrinkId       = '';
-    @track shrinkValue    = '';
+    @track shrinkValue    = '';      // amount to ADD this time
     @track shrinkNotes    = '';
     @track shrinkError    = '';
+    @track shrinkCurrentTotal = '0'; // running total (display only)
+    @track shrinkHistory  = [];
 
     get shrinkSaveLabel() {
-        return this.isShrinkSaving ? 'Saving...' : '✓ Update';
+        return this.isShrinkSaving ? 'Saving...' : '✓ Add Shrinkage';
+    }
+    get hasShrinkHistory() {
+        return this.shrinkHistory.length > 0;
     }
 
     openShrink(e) {
         this.shrinkId    = e.target.dataset.id;
         this.shrinkBrand = e.target.dataset.brand;
         this.shrinkType  = e.target.dataset.type;
-        this.shrinkValue = e.target.dataset.shrink || '0';
-        // dataset.notes is the string "undefined"/"null"/"" when unset
-        const n = e.target.dataset.notes;
-        this.shrinkNotes = (n && n !== 'undefined' && n !== 'null') ? n : '';
+        this.shrinkCurrentTotal =
+            parseFloat(e.target.dataset.shrink || '0').toFixed(2);
+        this.shrinkValue = '';   // fresh amount to add each time
+        this.shrinkNotes = '';
+        this.shrinkHistory = this._parseShrinkHistory(e.target.dataset.history);
         this.shrinkError = '';
         this.isShrinkOpen = true;
         this._scrollToTop();
+    }
+
+    _parseShrinkHistory(raw) {
+        if (!raw || raw === 'undefined' || raw === 'null') return [];
+        let entries;
+        try { entries = JSON.parse(raw); } catch (e) { return []; }
+        if (!Array.isArray(entries)) return [];
+        // newest first
+        return entries.slice().reverse().map((h, i) => {
+            const amt = parseFloat(h.amount) || 0;
+            const d   = h.date
+                ? new Date(h.date + 'T00:00:00').toLocaleDateString('en-IN',
+                    { day: '2-digit', month: 'short', year: '2-digit' })
+                : '';
+            return {
+                key: i,
+                amtLabel: (amt >= 0 ? '+' : '') + amt.toFixed(2) + ' KG',
+                amtClass: amt >= 0
+                    ? 'shrink-hist-amt shrink-hist-add'
+                    : 'shrink-hist-amt shrink-hist-sub',
+                dateLabel: d,
+                notes: h.notes || ''
+            };
+        });
     }
 
     closeShrink()     { this.isShrinkOpen = false; }
@@ -168,15 +198,15 @@ export default class InventoryView extends LightningElement {
     saveShrinkage() {
         this.shrinkError = '';
         const val = parseFloat(this.shrinkValue);
-        if (isNaN(val) || val < 0) {
-            this.shrinkError = 'Enter a valid positive number.';
+        if (isNaN(val) || val === 0) {
+            this.shrinkError = 'Enter a non-zero amount to add (or a negative number to correct).';
             return;
         }
         this.isShrinkSaving = true;
 
         updateShrinkage({
             inventoryId: this.shrinkId,
-            shrinkage:   val,
+            addAmount:   val,
             notes:       this.shrinkNotes || ''
         })
         .then(() => {
@@ -185,10 +215,12 @@ export default class InventoryView extends LightningElement {
             return refreshApex(this.wiredResult);
         })
         .then(() => {
+            const newTotal = (parseFloat(this.shrinkCurrentTotal) + val).toFixed(2);
             this.dispatchEvent(new ShowToastEvent({
                 title:   'Shrinkage updated',
-                message: this.shrinkBrand + ' shrinkage set to ' +
-                         val + ' KG.',
+                message: this.shrinkBrand + ': ' +
+                         (val >= 0 ? 'added ' : 'removed ') +
+                         Math.abs(val) + ' KG · new total ' + newTotal + ' KG.',
                 variant: 'success'
             }));
         })

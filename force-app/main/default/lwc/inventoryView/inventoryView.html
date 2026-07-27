@@ -16,15 +16,23 @@
             <div class="modal-body">
                 <div class="shrink-info">
                     Shrinkage = weight lost due to moisture, damaged
-                    packets, or samples given. Enter total KG lost
-                    from this batch.
+                    packets, or samples given. Each entry is added on top
+                    of the running total.
+                </div>
+                <div class="shrink-current">
+                    Current total shrinkage:
+                    <b>{shrinkCurrentTotal} KG</b>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Shrinkage (KG)</label>
+                    <label class="form-label">Add Shrinkage (KG)</label>
                     <input type="number" class="form-input"
-                        value={shrinkValue} min="0" step="0.1"
-                        placeholder="0.00"
+                        value={shrinkValue} step="0.1"
+                        placeholder="e.g. 0.2"
                         onchange={onShrinkVal}>
+                    <div class="form-hint">
+                        Adds on top of the current total. Use a negative
+                        number to correct an over-entry.
+                    </div>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Reason / Remarks</label>
@@ -36,6 +44,21 @@
                 </div>
                 <template if:true={shrinkError}>
                     <div class="form-error">&#9888; {shrinkError}</div>
+                </template>
+
+                <template if:true={hasShrinkHistory}>
+                    <div class="shrink-history-label">HISTORY</div>
+                    <template for:each={shrinkHistory} for:item="h">
+                        <div key={h.key} class="shrink-history-row">
+                            <div class="shrink-hist-top">
+                                <span class={h.amtClass}>{h.amtLabel}</span>
+                                <span class="shrink-hist-date">{h.dateLabel}</span>
+                            </div>
+                            <template if:true={h.notes}>
+                                <div class="shrink-hist-notes">{h.notes}</div>
+                            </template>
+                        </div>
+                    </template>
                 </template>
             </div>
             <div class="modal-footer">
@@ -348,7 +371,7 @@
                                 data-brand={inv.Brand__c}
                                 data-type={inv.Packet_Type__c}
                                 data-shrink={inv.Shrinkage__c}
-                                data-notes={inv.Shrinkage_Notes__c}
+                                data-history={inv.Shrinkage_History__c}
                                 onclick={openShrink}>
                                 Shrinkage
                             </button>

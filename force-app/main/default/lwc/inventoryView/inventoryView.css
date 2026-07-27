@@ -407,6 +407,52 @@
     margin-bottom: 16px;
 }
 
+.shrink-current {
+    font-size: 13px;
+    color: #374151;
+    padding: 4px 2px 12px;
+}
+.shrink-current b { color: #b45309; font-weight: 800; }
+
+.form-hint {
+    font-size: 11px;
+    color: #9ca3af;
+    margin-top: 5px;
+    line-height: 1.4;
+}
+
+/* Shrinkage history log */
+.shrink-history-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    margin: 16px 0 8px;
+}
+.shrink-history-row {
+    background: #f9fafb;
+    border: 1px solid #f0f0f0;
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+}
+.shrink-hist-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.shrink-hist-amt { font-size: 14px; font-weight: 800; }
+.shrink-hist-add { color: #b45309; }
+.shrink-hist-sub { color: #16a34a; }
+.shrink-hist-date { font-size: 11px; color: #9ca3af; }
+.shrink-hist-notes {
+    font-size: 12px;
+    color: #6b7280;
+    margin-top: 4px;
+    line-height: 1.5;
+}
+
 /* Form */
 .form-group   { margin-bottom: 12px; }
 .form-label   {

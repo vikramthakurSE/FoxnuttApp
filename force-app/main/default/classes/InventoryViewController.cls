@@ -8,7 +8,7 @@ public with sharing class InventoryViewController {
                    Total_Quantity__c, Remaining_Quantity__c,
                    Quantity_Sold__c, Avg_Cost_Per_Kg__c,
                    Packet_Count__c, Shrinkage__c, Shrinkage_Notes__c,
-                   Last_Purchase_Date__c
+                   Shrinkage_History__c, Last_Purchase_Date__c
             FROM Inventory__c
             ORDER BY Remaining_Quantity__c DESC NULLS LAST,
                      Brand__c ASC
@@ -92,32 +92,54 @@ public with sharing class InventoryViewController {
         };
     }
 
+    // Adds `addAmount` KG of shrinkage ON TOP of the running total (use a
+    // negative amount to correct an over-entry), logs a dated history entry
+    // with the reason, and recomputes Remaining = Total − Sold − Shrinkage.
     @AuraEnabled
     public static void updateShrinkage(
-        Id inventoryId, Decimal shrinkage, String notes
+        Id inventoryId, Decimal addAmount, String notes
     ) {
-        // Re-query to get current totals so we can
-        // correctly compute Remaining and Packet_Count
         Inventory__c current = [
-            SELECT Id, Total_Quantity__c, Quantity_Sold__c, Packet_Type__c
+            SELECT Id, Total_Quantity__c, Quantity_Sold__c,
+                   Shrinkage__c, Shrinkage_History__c
             FROM Inventory__c
             WHERE Id = :inventoryId
             LIMIT 1
         ];
 
-        Decimal total = current.Total_Quantity__c != null
-                        ? current.Total_Quantity__c : 0;
-        Decimal sold  = current.Quantity_Sold__c  != null
-                        ? current.Quantity_Sold__c  : 0;
-        Decimal shrink = shrinkage != null ? shrinkage : 0;
-        Decimal remaining = Math.max(0, total - sold - shrink);
+        Decimal total   = current.Total_Quantity__c != null
+                          ? current.Total_Quantity__c : 0;
+        Decimal sold    = current.Quantity_Sold__c  != null
+                          ? current.Quantity_Sold__c  : 0;
+        Decimal curShrink = current.Shrinkage__c != null
+                            ? current.Shrinkage__c : 0;
+        Decimal add     = addAmount != null ? addAmount : 0;
 
-        // Packet_Count__c is a formula field — Salesforce recomputes
-        // it automatically once Remaining_Quantity__c is updated.
+        // Running total never goes below zero; log the amount that actually
+        // applied so history stays consistent with the total.
+        Decimal newShrink = curShrink + add;
+        if (newShrink < 0) newShrink = 0;
+        Decimal applied = newShrink - curShrink;
+
+        Decimal remaining = Math.max(0, total - sold - newShrink);
+
+        // Append a JSON history entry: {date, amount, notes}
+        String entry = JSON.serialize(new Map<String, Object>{
+            'date'   => String.valueOf(Date.today()),
+            'amount' => applied,
+            'notes'  => String.isBlank(notes) ? '' : notes.trim()
+        });
+        String hist = current.Shrinkage_History__c;
+        String newHist = String.isBlank(hist)
+            ? '[' + entry + ']'
+            : hist.removeEnd(']') + ',' + entry + ']';
+
+        // Packet_Count__c is a formula field — recomputed automatically
         update new Inventory__c(
             Id                    = inventoryId,
-            Shrinkage__c          = shrink,
+            Shrinkage__c          = newShrink,
             Shrinkage_Notes__c    = String.isBlank(notes) ? null : notes.trim(),
+            Shrinkage_History__c  = newHist,
             Remaining_Quantity__c = remaining
         );
     }
