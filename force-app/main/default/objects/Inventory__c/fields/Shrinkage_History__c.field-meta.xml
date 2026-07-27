@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Shrinkage_History__c</fullName>
+    <label>Shrinkage History</label>
+    <type>LongTextArea</type>
+    <length>32768</length>
+    <visibleLines>5</visibleLines>
+    <description>JSON log of every shrinkage entry for this brand: [{date, amount, notes}]. Each entry is added on top of the running total; used to show a dated history with reasons.</description>
+    <trackTrending>false</trackTrending>
+</CustomField>
