@@ -1,43 +1,47 @@
 /**
- * @description : Push-notification companion to DeliveryReminderHelper's
- * 8 AM email. Runs twice a day:
- *  - 11 AM: "Due Today" push (once) + "Delayed" push
- *  - 2 PM:  "Delayed" push only
- * Delayed = Expected_Delivery_Date__c in the past, status still
- * Confirmed/Out for Delivery — repeats every run until the order is
- * delivered (or cancelled).
+ * @description : Daily push notification for pending deliveries — every
+ * undelivered order (Confirmed / Out for Delivery), categorized as
+ * delayed / due today / tomorrow / upcoming. Runs twice a day:
+ *  - 11 AM (isPrimary = true):  push if ANY delivery is pending
+ *  - 2 PM  (isPrimary = false): push only if something is urgent
+ *                               (delayed or due today) — avoids a second
+ *                               daily ping when only future orders remain
+ * Delayed = Expected_Delivery_Date__c in the past, still not delivered —
+ * keeps appearing every day until the order is delivered or cancelled.
  **/
 public class DeliveryStatusReminderHelper {
 
-    public static void sendReminders(Boolean includeDueToday) {
-        Date today = Date.today();
+    public static void sendReminders(Boolean isPrimary) {
+        Date today    = Date.today();
+        Date tomorrow = today.addDays(1);
 
-        if (includeDueToday) {
-            List<Sale__c> dueToday = [
-                SELECT Id, Name, Expected_Delivery_Date__c,
-                       Regional_Manager__c, Total_Revenue__c,
-                       Balance_Due__c, Order_Status__c,
-                       Client__r.Name, Client__r.Phone
-                FROM Sale__c
-                WHERE Expected_Delivery_Date__c = :today
-                AND Order_Status__c IN ('Confirmed', 'Out for Delivery')
-            ];
-            if (!dueToday.isEmpty()) {
-                NotificationHelper.notifyDeliveryReminder(dueToday, true);
-            }
-        }
-
-        List<Sale__c> delayed = [
+        List<Sale__c> pending = [
             SELECT Id, Name, Expected_Delivery_Date__c,
-                   Regional_Manager__c, Total_Revenue__c,
-                   Balance_Due__c, Order_Status__c,
-                   Client__r.Name, Client__r.Phone
+                   Total_Revenue__c, Order_Status__c,
+                   Client__r.Name
             FROM Sale__c
-            WHERE Expected_Delivery_Date__c < :today
-            AND Order_Status__c IN ('Confirmed', 'Out for Delivery')
+            WHERE Order_Status__c IN ('Confirmed', 'Out for Delivery')
         ];
-        if (!delayed.isEmpty()) {
-            NotificationHelper.notifyDeliveryDelayed(delayed);
+        if (pending.isEmpty()) return;
+
+        Integer delayed = 0, dueToday = 0, dueTomorrow = 0, upcoming = 0;
+        Decimal totalValue = 0;
+
+        for (Sale__c s : pending) {
+            totalValue += s.Total_Revenue__c != null ? s.Total_Revenue__c : 0;
+            Date d = s.Expected_Delivery_Date__c;
+            if (d == null)            upcoming++;      // no date set — treat as upcoming
+            else if (d < today)       delayed++;
+            else if (d == today)      dueToday++;
+            else if (d == tomorrow)   dueTomorrow++;
+            else                      upcoming++;
         }
+
+        // 2 PM run only pings again when something actually needs action today
+        if (!isPrimary && delayed == 0 && dueToday == 0) return;
+
+        NotificationHelper.notifyPendingDeliveries(
+            pending.size(), delayed, dueToday, dueTomorrow, upcoming, totalValue
+        );
     }
 }

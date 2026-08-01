@@ -36,8 +36,19 @@ public class NotificationHelper {
         notification.setTitle(title);
         notification.setBody(body);
         notification.setNotificationTypeId(notificationTypeId);
+
+        // A custom notification MUST have a navigation target or the send
+        // throws. Record-specific alerts pass a targetId; summary alerts
+        // (e.g. pending deliveries) have none, so fall back to a page
+        // reference that opens the Sales list.
         if (targetId != null) {
             notification.setTargetId(targetId);
+        } else {
+            notification.setTargetPageRef(
+                '{"type":"standard__objectPage",' +
+                '"attributes":{"objectApiName":"Sale__c","actionName":"list"},' +
+                '"state":{}}'
+            );
         }
 
         try {
@@ -211,6 +222,37 @@ public class NotificationHelper {
             totalValue.setScale(0) + ' · Tap to view orders',
             null
         );
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // 4c. PENDING DELIVERIES — one daily summary of every undelivered order,
+    // with the delayed / due-today ones called out first. Sent by
+    // DeliveryStatusReminderHelper so the team gets a daily nudge whenever
+    // anything is still awaiting delivery.
+    // ════════════════════════════════════════════════════════════════════════
+    public static void notifyPendingDeliveries(
+        Integer total, Integer delayed, Integer dueToday,
+        Integer dueTomorrow, Integer upcoming, Decimal totalValue
+    ) {
+        if (total == null || total <= 0) return;
+
+        List<String> parts = new List<String>();
+        if (delayed     > 0) parts.add('⚠️ ' + delayed + ' delayed');
+        if (dueToday    > 0) parts.add('📦 ' + dueToday + ' due today');
+        if (dueTomorrow > 0) parts.add('🕒 ' + dueTomorrow + ' tomorrow');
+        if (upcoming    > 0) parts.add('📅 ' + upcoming + ' upcoming');
+
+        String body = String.join(parts, ' · ')
+            + ' · ₹' + (totalValue != null ? totalValue.setScale(0) : 0)
+            + ' · Tap to view';
+
+        // Lead with the most urgent state in the title
+        String title;
+        if (delayed > 0)       title = '⚠️ ' + total + ' deliveries pending (' + delayed + ' delayed)';
+        else if (dueToday > 0) title = '🚚 ' + total + ' deliveries pending (' + dueToday + ' today)';
+        else                   title = '🚚 ' + total + ' deliver' + (total == 1 ? 'y' : 'ies') + ' pending';
+
+        send(TYPE_DELIVERY, title, body, null);
     }
 
     // ════════════════════════════════════════════════════════════════════════
