@@ -15,6 +15,7 @@ trigger SaleTrigger on Sale__c (after insert, after update, before delete) {
         Set<Id> deliveredNow   = new Set<Id>();
         Set<Id> undeliveredNow = new Set<Id>();
         Set<Id> statusChanged  = new Set<Id>();
+        Set<Id> approvedNow    = new Set<Id>();
 
         for (Sale__c s : Trigger.new) {
             Sale__c old = Trigger.oldMap.get(s.Id);
@@ -24,6 +25,32 @@ trigger SaleTrigger on Sale__c (after insert, after update, before delete) {
                 deliveredNow.add(s.Id);
             else if (old.Order_Status__c == 'Delivered')
                 undeliveredNow.add(s.Id);
+            // Web order approved — customer gets the order confirmation now
+            if (old.Order_Status__c == 'Pending Approval'
+                && s.Order_Status__c == 'Confirmed')
+                approvedNow.add(s.Id);
+        }
+
+        // WhatsApp order confirmation for approved web orders
+        if (!approvedNow.isEmpty()) {
+            List<Sale__c> approvedSales = [
+                SELECT Id, Name, Order_Status__c,
+                       Expected_Delivery_Date__c,
+                       Client__r.Name, Client__r.Phone
+                FROM Sale__c WHERE Id IN :approvedNow
+            ];
+            Map<Id, List<Sale_Line_Item__c>> approvedLiMap =
+                new Map<Id, List<Sale_Line_Item__c>>();
+            for (Sale_Line_Item__c li : [
+                SELECT Id, Sale__c, Brand__c, Packet_Type__c,
+                       Quantity__c, Rate_Per_Kg__c
+                FROM Sale_Line_Item__c WHERE Sale__c IN :approvedNow
+            ]) {
+                if (!approvedLiMap.containsKey(li.Sale__c))
+                    approvedLiMap.put(li.Sale__c, new List<Sale_Line_Item__c>());
+                approvedLiMap.get(li.Sale__c).add(li);
+            }
+            WhatsAppHelper.dispatchOrderConfirmed(approvedSales, approvedLiMap);
         }
 
         // Inventory adjustments

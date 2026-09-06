@@ -126,9 +126,16 @@ public class SaleLineItemHelper {
 
         if (!salesForNotif.isEmpty()) {
             NotificationHelper.notifyNewSale(salesForNotif, liMap);
-            // WhatsApp order confirmation to client
-            // WhatsApp order confirmation to client
-            WhatsAppHelper.dispatchOrderConfirmed(salesForNotif, liMap);
+            // WhatsApp order confirmation to client — but NOT for web
+            // orders awaiting approval; that confirmation goes out when
+            // the status flips to Confirmed (see SaleTrigger).
+            List<Sale__c> confirmable = new List<Sale__c>();
+            for (Sale__c s : salesForNotif) {
+                if (s.Order_Status__c != 'Pending Approval')
+                    confirmable.add(s);
+            }
+            if (!confirmable.isEmpty())
+                WhatsAppHelper.dispatchOrderConfirmed(confirmable, liMap);
         }
     }
 
