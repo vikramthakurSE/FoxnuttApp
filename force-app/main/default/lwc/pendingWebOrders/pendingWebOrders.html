@@ -1,0 +1,82 @@
+<template>
+    <lightning-card title="Pending Web Orders" icon-name="standard:orders">
+        <lightning-button
+            slot="actions"
+            label="Refresh"
+            icon-name="utility:refresh"
+            onclick={handleRefresh}>
+        </lightning-button>
+
+        <div class="slds-var-p-horizontal_medium">
+            <template if:true={loading}>
+                <lightning-spinner alternative-text="Loading"></lightning-spinner>
+            </template>
+
+            <template if:true={error}>
+                <div class="slds-text-color_error slds-var-p-vertical_small">
+                    {error}
+                </div>
+            </template>
+
+            <template if:true={isEmpty}>
+                <div class="slds-text-color_weak slds-var-p-vertical_medium">
+                    No orders waiting for approval.
+                </div>
+            </template>
+
+            <template for:each={orders} for:item="o">
+                <div key={o.saleId} class="order-card slds-var-m-bottom_small">
+                    <div class="slds-grid slds-wrap slds-grid_align-spread">
+                        <div>
+                            <span class="slds-text-heading_small">{o.saleName}</span>
+                            <template if:true={o.isNewCustomer}>
+                                <span class="slds-badge slds-badge_lightest slds-var-m-left_x-small">
+                                    New customer
+                                </span>
+                            </template>
+                            <div class="slds-text-body_small slds-text-color_weak">
+                                {o.clientName} &middot; {o.clientPhone}
+                                <template if:true={o.businessCode}>
+                                    &middot; {o.businessCode}
+                                </template>
+                            </div>
+                        </div>
+                        <div class="slds-text-heading_small">
+                            &#8377;{o.total}
+                        </div>
+                    </div>
+
+                    <ul class="slds-list_dotted slds-var-m-top_x-small slds-text-body_small">
+                        <template for:each={o.items} for:item="line">
+                            <li key={line}>{line}</li>
+                        </template>
+                    </ul>
+
+                    <template if:true={o.deliveryAddress}>
+                        <div class="slds-text-body_small slds-text-color_weak slds-var-m-top_x-small">
+                            Deliver to: {o.deliveryAddress}
+                        </div>
+                    </template>
+
+                    <div class="slds-var-m-top_small">
+                        <lightning-button
+                            variant="brand"
+                            label="Approve"
+                            data-id={o.saleId}
+                            onclick={handleApprove}
+                            disabled={busy}>
+                        </lightning-button>
+                        <lightning-button
+                            class="slds-var-m-left_x-small"
+                            variant="destructive-text"
+                            label="Cancel order"
+                            data-id={o.saleId}
+                            onclick={handleReject}
+                            disabled={busy}>
+                        </lightning-button>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </lightning-card>
+</template>

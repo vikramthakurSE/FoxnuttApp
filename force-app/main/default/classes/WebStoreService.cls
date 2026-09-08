@@ -303,11 +303,11 @@ public without sharing class WebStoreService {
                 insert client;   // AccountTrigger sends the WhatsApp welcome
             }
 
-            // Every website order waits for approval. The business code is
-            // derivable from a client's name and phone, so it identifies a
-            // customer but does not authenticate them — a human check stands
-            // between a guessed code and a live order in the books.
-            String status = 'Pending Approval';
+            // A known client's order goes live at once: stock is blocked and
+            // the confirmation WhatsApp goes out. A first-time customer waits
+            // for a human to vet them, since nothing yet ties that phone to a
+            // real business.
+            String status = isNew ? 'Pending Approval' : 'Confirmed';
 
             Sale__c sale = new Sale__c(
                 Client__c          = client.Id,
