@@ -65,6 +65,11 @@
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
+        <field>Account.Unique_Business_Code__c</field>
+        <editable>true</editable>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
         <field>Account.Phone_Digits__c</field>
         <editable>true</editable>
         <readable>true</readable>

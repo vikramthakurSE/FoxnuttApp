@@ -21,10 +21,42 @@ global with sharing class WebStoreAPI {
                 respond(res, 200, new Map<String, Object>{
                     'products' => WebStoreService.getCatalog()
                 });
+            } else if (path.contains('/verify-code')) {
+                // Resolve a client's login code to their account. Returns
+                // 200 with found=false rather than 404, so the website can
+                // tell "wrong code" apart from "endpoint is down".
+                Account a = WebStoreService.findClientByCode(
+                    req.params.get('code'));
+                Map<String, Object> out = new Map<String, Object>{
+                    'found' => a != null
+                };
+                if (a != null) {
+                    out.put('accountId',   a.Id);
+                    out.put('accountName', a.Name);
+                    out.put('phone',       a.Phone_Digits__c);
+                    out.put('code',        a.Unique_Business_Code__c);
+                    out.put('gstin',       a.GSTIN__c);
+                    out.put('address', String.join(
+                        new List<String>{
+                            a.BillingStreet, a.BillingCity,
+                            a.BillingState, a.BillingPostalCode
+                        }, ', ').replaceAll('(, )+', ', ')
+                         .removeStart(', ').removeEnd(', '));
+                }
+                respond(res, 200, out);
             } else if (path.contains('/orders')) {
+                // Orders are addressable by code or by phone; the code is
+                // what the website holds after login.
                 String phone = req.params.get('phone');
+                String code  = req.params.get('code');
+                if (String.isNotBlank(code)) {
+                    Account a = WebStoreService.findClientByCode(code);
+                    phone = (a == null) ? null : a.Phone_Digits__c;
+                }
                 respond(res, 200, new Map<String, Object>{
-                    'orders' => WebStoreService.getOrders(phone)
+                    'orders' => String.isBlank(phone)
+                        ? new List<Object>()
+                        : WebStoreService.getOrders(phone)
                 });
             } else {
                 respond(res, 404, error('Unknown resource.'));

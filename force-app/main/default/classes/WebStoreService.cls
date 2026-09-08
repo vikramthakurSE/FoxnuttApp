@@ -23,6 +23,7 @@ public without sharing class WebStoreService {
         public Integer packets;
     }
     public class OrderInput {
+        public String businessCode;   // existing client's login code
         public String phone;          // any format; normalized to 10 digits
         public String name;           // contact person
         public String businessName;   // shop / business (optional)
@@ -44,6 +45,97 @@ public without sharing class WebStoreService {
     }
 
     // ── Phone normalization — mirror of WhatsAppHelper.fmtPhone ──────────
+    /**
+     * Build the client's website login code: first 3 letters of the account
+     * name plus the first 5 digits of the phone. Priyanka / 9836482398
+     * becomes PRI98364.
+     *
+     * Callers must guarantee uniqueness — see assignBusinessCodes, which
+     * adds a numeric suffix rather than letting a duplicate block the
+     * insert. The code is generated once and never recalculated, because a
+     * renamed account would otherwise invalidate a code the client already
+     * has in their welcome message.
+     */
+    public static String buildBusinessCode(String accountName, String phone) {
+        String letters = accountName == null
+            ? '' : accountName.replaceAll('[^A-Za-z]', '').toUpperCase();
+        String digits = normalizePhone(phone);
+        if (String.isBlank(letters) || String.isBlank(digits)) return null;
+        // Short names are padded so the code keeps a predictable shape.
+        while (letters.length() < 3) letters += 'X';
+        return letters.substring(0, 3) + digits.substring(0, 5);
+    }
+
+    /**
+     * Stamp codes onto accounts that do not have one yet, resolving clashes
+     * against both the org and the rest of this batch.
+     *
+     * A duplicate would throw DUPLICATE_VALUE and block the account insert
+     * outright, so collisions must resolve to a suffix, never to an error.
+     */
+    public static void assignBusinessCodes(List<Account> accounts) {
+        List<Account> needing = new List<Account>();
+        for (Account a : accounts) {
+            if (String.isBlank(a.Unique_Business_Code__c)
+                && buildBusinessCode(a.Name, a.Phone) != null) {
+                needing.add(a);
+            }
+        }
+        if (needing.isEmpty()) return;
+
+        // Precompute every code a base could resolve to (base, base2 … base9)
+        // so one query covers the whole family. SOQL cannot express
+        // "starts with any of these", and this is bounded and exact.
+        Set<String> lookFor = new Set<String>();
+        for (Account a : needing) {
+            String base = buildBusinessCode(a.Name, a.Phone);
+            lookFor.add(base);
+            for (Integer n = 2; n <= 9; n++) lookFor.add(base + String.valueOf(n));
+        }
+
+        Set<String> taken = new Set<String>();
+        for (Account a : [
+            SELECT Unique_Business_Code__c FROM Account
+            WHERE Unique_Business_Code__c IN :lookFor
+        ]) {
+            if (a.Unique_Business_Code__c != null) {
+                taken.add(a.Unique_Business_Code__c.toUpperCase());
+            }
+        }
+
+        for (Account a : needing) {
+            String base = buildBusinessCode(a.Name, a.Phone);
+            String code = base;
+            Integer n = 1;
+            // Past base9 fall back to a random tail rather than looping on a
+            // pattern the query above did not cover.
+            while (taken.contains(code.toUpperCase())) {
+                n++;
+                code = n <= 9
+                    ? base + String.valueOf(n)
+                    : base + String.valueOf(
+                        Math.mod(Math.abs(Crypto.getRandomInteger()), 900) + 100);
+            }
+            taken.add(code.toUpperCase());
+            a.Unique_Business_Code__c = code;
+        }
+    }
+
+    /** Look up a client by their website login code. */
+    public static Account findClientByCode(String code) {
+        if (String.isBlank(code)) return null;
+        String clean = code.trim().toUpperCase();
+        List<Account> rows = [
+            SELECT Id, Name, Phone, Phone_Digits__c, Unique_Business_Code__c,
+                   BillingStreet, BillingCity, BillingState, BillingPostalCode,
+                   GSTIN__c
+            FROM Account
+            WHERE Unique_Business_Code__c = :clean
+            LIMIT 1
+        ];
+        return rows.isEmpty() ? null : rows[0];
+    }
+
     public static String normalizePhone(String raw) {
         if (String.isBlank(raw)) return null;
         String d = raw.replaceAll('[^0-9]', '');
@@ -100,10 +192,21 @@ public without sharing class WebStoreService {
         if (input == null || input.items == null || input.items.isEmpty())
             throw new WebStoreException('Order has no items.');
 
-        String digits = normalizePhone(input.phone);
+        // Two ways in: an existing client's business code, or first-time
+        // details. The code is authoritative — when it is present the phone
+        // and name come from the matched account, not from the browser.
+        Account coded = String.isNotBlank(input.businessCode)
+            ? findClientByCode(input.businessCode) : null;
+        if (String.isNotBlank(input.businessCode) && coded == null)
+            throw new WebStoreException(
+                'That business code was not recognised. Check it against your ' +
+                'welcome message, or order as a first-time customer.');
+
+        String digits = coded != null
+            ? coded.Phone_Digits__c : normalizePhone(input.phone);
         if (digits == null)
             throw new WebStoreException('A valid 10-digit phone number is required.');
-        if (String.isBlank(input.name))
+        if (coded == null && String.isBlank(input.name))
             throw new WebStoreException('Customer name is required.');
 
         // Idempotency: same orderRef → return the existing sale
@@ -175,8 +278,9 @@ public without sharing class WebStoreService {
             }
         }
 
-        // Match or create the client account by phone
-        Account client = findClientByPhone(digits);
+        // A verified code wins; otherwise fall back to matching on phone so a
+        // returning buyer who lost their code is not duplicated.
+        Account client = coded != null ? coded : findClientByPhone(digits);
         Boolean isNew  = (client == null);
 
         Savepoint sp = Database.setSavepoint();
@@ -199,8 +303,11 @@ public without sharing class WebStoreService {
                 insert client;   // AccountTrigger sends the WhatsApp welcome
             }
 
-            // Known clients auto-confirm; new customers wait for approval
-            String status = isNew ? 'Pending Approval' : 'Confirmed';
+            // Every website order waits for approval. The business code is
+            // derivable from a client's name and phone, so it identifies a
+            // customer but does not authenticate them — a human check stands
+            // between a guessed code and a live order in the books.
+            String status = 'Pending Approval';
 
             Sale__c sale = new Sale__c(
                 Client__c          = client.Id,
