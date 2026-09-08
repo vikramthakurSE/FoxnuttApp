@@ -3,6 +3,10 @@
     <label>Web Store Admin</label>
     <hasActivationRequired>false</hasActivationRequired>
     <classAccesses>
+        <apexClass>PendingWebOrdersController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
         <apexClass>WebStoreAPI</apexClass>
         <enabled>true</enabled>
     </classAccesses>
