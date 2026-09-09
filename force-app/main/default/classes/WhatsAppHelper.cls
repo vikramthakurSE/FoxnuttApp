@@ -124,11 +124,19 @@ public class WhatsAppHelper {
     // Template: welcome_new_client  |  {{1}} = client name
     // ════════════════════════════════════════════════════════════════════════
     @future(callout=true)
-    public static void sendWelcome(String phone, String clientName) {
+    public static void sendWelcome(
+        String phone, String clientName, String businessCode
+    ) {
         String p = fmtPhone(phone);
         if (p == null) return;
+        // {{2}} carries the website login code. The welcome_new_client
+        // template must be edited in Meta to add it, or the send is
+        // rejected for a parameter-count mismatch.
         sendMessage(buildPayload(p, 'welcome_new_client',
-            new List<String>{ clientName }));
+            new List<String>{
+                clientName,
+                String.isBlank(businessCode) ? '-' : businessCode
+            }));
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -143,7 +151,11 @@ public class WhatsAppHelper {
     ) {
         String p = fmtPhone(phone);
         if (p == null) return;
-        sendMessage(buildPayload(p, 'order_confirmed',
+        // order_confirmed was approved with an IMAGE header, so it must be
+        // sent with a header image or Meta rejects it (error 132012). Reuse
+        // the shared header image used by the follow-up template.
+        sendMessage(buildPayloadWithImageHeader(
+            p, 'order_confirmed', FOLLOWUP_HEADER_IMAGE_URL,
             new List<String>{ clientName, saleName,
                               products, total, deliveryDate }));
     }
@@ -263,7 +275,7 @@ public class WhatsAppHelper {
     public static void dispatchWelcome(List<Account> accounts) {
         for (Account a : accounts) {
             if (String.isBlank(a.Phone)) continue;
-            sendWelcome(a.Phone, a.Name);
+            sendWelcome(a.Phone, a.Name, a.Unique_Business_Code__c);
         }
     }
 
@@ -349,6 +361,39 @@ public class WhatsAppHelper {
                 s.Name,
                 bal.setScale(0).format()
             );
+        }
+    }
+
+    // Called from ClientPaymentSummaryTrigger. Runs @future so it fires AFTER
+    // the Settlement_Amount roll-up into Sale.Total_Collected has committed —
+    // otherwise Balance_Due__c is read stale and (with a cash discount) still
+    // shows the pre-payment balance to the client.
+    @future(callout=true)
+    public static void dispatchPaymentReceivedAsync(Set<Id> paymentIds) {
+        for (Client_Payment__c p : [
+            SELECT Amount__c, Sale__r.Name, Sale__r.Balance_Due__c,
+                   Sale__r.Client__r.Name, Sale__r.Client__r.Phone
+            FROM Client_Payment__c
+            WHERE Id IN :paymentIds
+        ]) {
+            if (p.Sale__r == null
+                || String.isBlank(p.Sale__r.Client__r?.Phone)) continue;
+
+            String ph = fmtPhone(p.Sale__r.Client__r.Phone);
+            if (ph == null) continue;
+
+            Decimal amt = p.Amount__c != null ? p.Amount__c : 0;
+            Decimal bal = p.Sale__r.Balance_Due__c != null
+                          ? p.Sale__r.Balance_Due__c : 0;
+            if (bal < 0) bal = 0;   // a CD over-settlement shows as ₹0, not negative
+
+            sendMessage(buildPayload(ph, 'payment_received',
+                new List<String>{
+                    p.Sale__r.Client__r.Name,
+                    amt.setScale(0).format(),
+                    p.Sale__r.Name,
+                    bal.setScale(0).format()
+                }));
         }
     }
 
