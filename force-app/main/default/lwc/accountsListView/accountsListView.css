@@ -456,3 +456,117 @@
     margin-top: 4px;
     display: inline-block;
 }
+/* ── Pending web orders ────────────────────────────────────────────────
+   Sits above the search so a first-time customer's order cannot be
+   missed. Red rather than the amber used for outstanding balances —
+   this needs an action, not just attention.                            */
+.pending-wrap {
+    background: #fff1f2;
+    border-bottom: 1px solid #fecdd3;
+    padding: 12px 14px 14px;
+}
+.pending-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #9f1239;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    margin-bottom: 10px;
+}
+.pending-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #e11d48;
+    box-shadow: 0 0 0 3px rgba(225,29,72,.2);
+    flex: none;
+}
+.pending-card {
+    background: #fff;
+    border: 1px solid #fecdd3;
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+}
+.pending-card:last-child { margin-bottom: 0; }
+.pending-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+}
+.pending-left { flex: 1; min-width: 0; }
+.pending-name {
+    font-size: 15px;
+    font-weight: 700;
+    color: #0f172a;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.pending-badge {
+    background: #e11d48;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .05em;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+.pending-meta {
+    font-size: 12px;
+    color: #64748b;
+    margin-top: 2px;
+}
+.pending-amount {
+    font-size: 16px;
+    font-weight: 700;
+    color: #0f172a;
+    white-space: nowrap;
+}
+.pending-items {
+    font-size: 12.5px;
+    color: #334155;
+    margin-top: 8px;
+    line-height: 1.4;
+}
+.pending-addr {
+    font-size: 12px;
+    color: #64748b;
+    margin-top: 4px;
+}
+.pending-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+.btn-approve, .btn-reject {
+    flex: 1;
+    height: 38px;
+    border-radius: 8px;
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid transparent;
+}
+.btn-approve {
+    background: #16a34a;
+    color: #fff;
+}
+.btn-approve:active { background: #15803d; }
+.btn-reject {
+    background: #fff;
+    color: #64748b;
+    border-color: #cbd5e1;
+    flex: 0 0 90px;
+}
+.btn-reject:active { background: #f8fafc; }
+.btn-approve[disabled], .btn-reject[disabled] {
+    opacity: .5;
+    cursor: default;
+}

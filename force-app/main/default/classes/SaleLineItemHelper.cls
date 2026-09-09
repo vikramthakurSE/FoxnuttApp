@@ -130,12 +130,18 @@ public class SaleLineItemHelper {
             // orders awaiting approval; that confirmation goes out when
             // the status flips to Confirmed (see SaleTrigger).
             List<Sale__c> confirmable = new List<Sale__c>();
+            List<Sale__c> pending     = new List<Sale__c>();
             for (Sale__c s : salesForNotif) {
-                if (s.Order_Status__c != 'Pending Approval')
-                    confirmable.add(s);
+                if (s.Order_Status__c == 'Pending Approval') pending.add(s);
+                else confirmable.add(s);
             }
             if (!confirmable.isEmpty())
                 WhatsAppHelper.dispatchOrderConfirmed(confirmable, liMap);
+            // A pending order still gets an acknowledgement, so the customer
+            // knows it landed and that someone will call — silence here reads
+            // as a failed order.
+            if (!pending.isEmpty())
+                WhatsAppHelper.dispatchOrderPending(pending);
         }
     }
 

@@ -10,6 +10,58 @@
         </div>
     </div>
 
+    <!-- PENDING WEB ORDERS — first-time customers awaiting approval -->
+    <template if:true={hasPending}>
+        <div class="pending-wrap">
+            <div class="pending-head">
+                <span class="pending-dot"></span>
+                {pendingHeading}
+            </div>
+
+            <template for:each={pendingOrders} for:item="p">
+                <div key={p.saleId} class="pending-card">
+                    <div class="pending-row">
+                        <div class="pending-left">
+                            <div class="pending-name">
+                                {p.clientName}
+                                <template if:true={p.isNewCustomer}>
+                                    <span class="pending-badge">NEW</span>
+                                </template>
+                            </div>
+                            <div class="pending-meta">
+                                {p.saleName} &middot; {p.clientPhone}
+                            </div>
+                        </div>
+                        <div class="pending-amount">&#8377;{p.amount}</div>
+                    </div>
+
+                    <div class="pending-items">{p.itemsLabel}</div>
+
+                    <template if:true={p.deliveryAddress}>
+                        <div class="pending-addr">
+                            &#128205; {p.deliveryAddress}
+                        </div>
+                    </template>
+
+                    <div class="pending-actions">
+                        <button class="btn-approve"
+                            data-id={p.saleId}
+                            onclick={handleApprove}
+                            disabled={pendingBusy}>
+                            &#10003; Confirm order
+                        </button>
+                        <button class="btn-reject"
+                            data-id={p.saleId}
+                            onclick={handleReject}
+                            disabled={pendingBusy}>
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </template>
+
     <!-- SEARCH -->
     <div class="search-wrap">
         <div class="search-box">

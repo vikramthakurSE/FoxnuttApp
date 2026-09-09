@@ -140,6 +140,24 @@ public class WhatsAppHelper {
     }
 
     // ════════════════════════════════════════════════════════════════════════
+    // 1b. ORDER PENDING — first web order from an unknown customer
+    // Template: order_pending_review
+    // {{1}} name, {{2}} order#
+    // ════════════════════════════════════════════════════════════════════════
+    @future(callout=true)
+    public static void sendOrderPending(
+        String phone, String clientName, String saleName
+    ) {
+        String p = fmtPhone(phone);
+        if (p == null) return;
+        sendMessage(buildPayload(p, 'order_pending_review',
+            new List<String>{
+                String.isBlank(clientName) ? 'there' : clientName,
+                String.isBlank(saleName) ? '-' : saleName
+            }));
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
     // 2. ORDER CONFIRMED — after sale + line items saved
     // Template: order_confirmed
     // {{1}} name, {{2}} order#, {{3}} products, {{4}} total, {{5}} delivery
@@ -276,6 +294,14 @@ public class WhatsAppHelper {
         for (Account a : accounts) {
             if (String.isBlank(a.Phone)) continue;
             sendWelcome(a.Phone, a.Name, a.Unique_Business_Code__c);
+        }
+    }
+
+    // ── 1b. Order Pending — called from SaleLineItemHelper.onInsert ───────
+    public static void dispatchOrderPending(List<Sale__c> sales) {
+        for (Sale__c s : sales) {
+            if (String.isBlank(s.Client__r?.Phone)) continue;
+            sendOrderPending(s.Client__r.Phone, s.Client__r.Name, s.Name);
         }
     }
 

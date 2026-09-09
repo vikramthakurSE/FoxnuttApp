@@ -2,7 +2,14 @@ import { LightningElement, track, wire } from 'lwc';
 import { CurrentPageReference } from 'lightning/navigation';
 import { NavigationMixin } from 'lightning/navigation';
 import { refreshApex } from '@salesforce/apex';
+import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import getAccounts from '@salesforce/apex/AccountsListController.getAccounts';
+import getPendingOrders
+    from '@salesforce/apex/PendingWebOrdersController.getPendingOrders';
+import approveOrder
+    from '@salesforce/apex/PendingWebOrdersController.approveOrder';
+import rejectOrder
+    from '@salesforce/apex/PendingWebOrdersController.rejectOrder';
 
 export default class AccountsListView extends NavigationMixin(
     LightningElement
@@ -13,8 +20,91 @@ export default class AccountsListView extends NavigationMixin(
     @track clients       = [];
     @track suppliers     = [];
     @track _searchTimer  = null;
+    @track pendingOrders = [];
+    @track pendingBusy   = false;
 
     wiredAccountsResult;
+    wiredPendingResult;
+
+    // Website orders from first-time customers sit here until approved.
+    // Surfaced above everything else so they are not missed.
+    @wire(getPendingOrders)
+    wiredPending(result) {
+        this.wiredPendingResult = result;
+        if (result.data) {
+            this.pendingOrders = result.data.map((o) => ({
+                ...o,
+                itemsLabel: (o.items || []).join(', '),
+                amount: this.formatAmount(o.total)
+            }));
+        } else if (result.error) {
+            this.pendingOrders = [];
+        }
+    }
+
+    get hasPending() {
+        return this.pendingOrders.length > 0;
+    }
+
+    get pendingCount() {
+        return this.pendingOrders.length;
+    }
+
+    get pendingHeading() {
+        return this.pendingOrders.length === 1
+            ? '1 web order awaiting approval'
+            : this.pendingOrders.length + ' web orders awaiting approval';
+    }
+
+    formatAmount(v) {
+        const n = Number(v || 0);
+        return n.toLocaleString('en-IN', { maximumFractionDigits: 0 });
+    }
+
+    handleApprove(event) {
+        event.stopPropagation();
+        this.runPendingAction(
+            approveOrder,
+            event.currentTarget.dataset.id,
+            'Order confirmed. Stock is blocked and the customer has been messaged.'
+        );
+    }
+
+    handleReject(event) {
+        event.stopPropagation();
+        this.runPendingAction(
+            rejectOrder,
+            event.currentTarget.dataset.id,
+            'Order cancelled.'
+        );
+    }
+
+    runPendingAction(apexMethod, saleId, successMessage) {
+        if (!saleId || this.pendingBusy) return;
+        this.pendingBusy = true;
+        apexMethod({ saleId })
+            .then(() => {
+                this.showToast('Done', successMessage, 'success');
+                return Promise.all([
+                    refreshApex(this.wiredPendingResult),
+                    refreshApex(this.wiredAccountsResult)
+                ]);
+            })
+            .catch((e) => {
+                this.showToast(
+                    'Could not update the order',
+                    (e && e.body && e.body.message) || 'Something went wrong.',
+                    'error'
+                );
+            })
+            .finally(() => {
+                this.pendingBusy = false;
+            });
+    }
+
+    showToast(title, message, variant) {
+        this.dispatchEvent(new ShowToastEvent({ title, message, variant }));
+    }
 
     @wire(getAccounts, { searchTerm: '$searchTerm' })
     wiredAccounts(result) {
@@ -34,6 +124,7 @@ export default class AccountsListView extends NavigationMixin(
     pageRefHandler(pageRef) {
         if (pageRef && this.wiredAccountsResult) {
             refreshApex(this.wiredAccountsResult);
+            if (this.wiredPendingResult) refreshApex(this.wiredPendingResult);
         }
     }
 
@@ -42,6 +133,9 @@ export default class AccountsListView extends NavigationMixin(
         this._visHandler = () => {
             if (!document.hidden && this.wiredAccountsResult) {
                 refreshApex(this.wiredAccountsResult);
+                if (this.wiredPendingResult) {
+                    refreshApex(this.wiredPendingResult);
+                }
             }
         };
         document.addEventListener('visibilitychange', this._visHandler);
