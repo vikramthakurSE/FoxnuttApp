@@ -71,7 +71,8 @@ public class FollowUpNotificationHelper {
                    Expected_Delivery_Date__c,
                    Balance_Due__c,
                    Client__r.Name,
-                   Client__r.Phone
+                   Client__r.Phone,
+                   Client__r.Unique_Business_Code__c
             FROM Sale__c
             WHERE Order_Status__c = 'Delivered'
             AND Client__c != null
@@ -258,7 +259,8 @@ public class FollowUpNotificationHelper {
             if (sendWhatsAppToday && followUpOn
                     && String.isNotBlank(s.Client__r.Phone)) {
                 WhatsAppHelper.dispatchOrderFollowUp(
-                    s.Client__r.Phone, s.Client__r.Name, dateStr
+                    s.Client__r.Phone, s.Client__r.Name, dateStr,
+                    s.Client__r.Unique_Business_Code__c
                 );
             }
         }

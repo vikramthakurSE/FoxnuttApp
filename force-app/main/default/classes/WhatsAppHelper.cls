@@ -288,25 +288,27 @@ public class WhatsAppHelper {
 
     // ════════════════════════════════════════════════════════════════════════
     // 7. ORDER FOLLOW-UP REMINDER (21+ days no order)
-    // Template: order_followup_reminder — approved with an IMAGE header
-    // {{1}} name, {{2}} last order date, {{3}} stock + prices block
+    // Template: order_followup_reminder — header {{1}} website login code
+    // Body {{1}} name, {{2}} last order date, {{3}} stock + prices block.
+    // Header and body number their variables independently. The header used
+    // to carry the branded photo (FOLLOWUP_HEADER_IMAGE_URL below, kept in
+    // case that trade is reversed) — a header can only be one type, so
+    // showing the code here means the photo no longer appears on this
+    // message.
     // ════════════════════════════════════════════════════════════════════════
-    // TODO: Google Drive hotlinking is not reliable for an automated send —
-    // Meta's fetcher can be rate-limited or blocked by Drive's abuse
-    // detection. Move this to a permanent host (Meta's own /media upload,
-    // or a static file host) when convenient.
     private static final String FOLLOWUP_HEADER_IMAGE_URL =
         'https://drive.google.com/uc?export=download&id=1vJpyG9QHyTJLLZ6P96zT7G3I6W6ODGd7';
 
     @future(callout=true)
     public static void sendOrderFollowUp(
-        String phone, String clientName,
-        String lastOrderDate, String stockBlock
+        String phone, String clientName, String lastOrderDate,
+        String stockBlock, String businessCode
     ) {
         String p = fmtPhone(phone);
         if (p == null) return;
-        sendMessage(buildPayloadWithImageHeader(
-            p, 'order_followup_reminder', FOLLOWUP_HEADER_IMAGE_URL,
+        sendMessage(buildPayloadWithTextHeader(
+            p, 'order_followup_reminder',
+            String.isBlank(businessCode) ? '-' : businessCode,
             new List<String>{ clientName, lastOrderDate, stockBlock }));
     }
 
@@ -472,7 +474,8 @@ public class WhatsAppHelper {
     // ── 7. Order Follow-Up — called from FollowUpNotificationHelper ─────────
     // Builds live stock block from Inventory with Selling_Price__c
     public static void dispatchOrderFollowUp(
-        String phone, String clientName, String lastOrderDate
+        String phone, String clientName, String lastOrderDate,
+        String businessCode
     ) {
         if (String.isBlank(phone)) return;
 
@@ -498,7 +501,9 @@ public class WhatsAppHelper {
         if (stockBlock.length() > 300)
             stockBlock = stockBlock.substring(0, 297) + '...';
 
-        sendOrderFollowUp(phone, clientName, lastOrderDate, stockBlock);
+        sendOrderFollowUp(
+            phone, clientName, lastOrderDate, stockBlock, businessCode
+        );
     }
 
     // ── 8. Payment Follow-Up — called from PaymentReminderHelper ───────────
