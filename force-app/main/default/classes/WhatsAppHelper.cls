@@ -81,6 +81,46 @@ public class WhatsAppHelper {
     /** Same as buildPayload, but for templates whose approved header is an
      *  IMAGE — the API rejects the send otherwise (error 132012, format
      *  mismatch) even though the body parameters are correct. */
+    /** Same as buildPayload, but for templates whose header carries a text
+     *  variable — e.g. a login code shown at the top of the message. A
+     *  header can hold at most one variable; it is numbered {{1}} in the
+     *  header component independently of the body's own {{1}}, {{2}}, ... */
+    private static String buildPayloadWithTextHeader(
+        String to, String templateName, String headerText, List<String> bodyParams
+    ) {
+        List<Object> bodyParameters = new List<Object>();
+        for (String p : bodyParams) {
+            bodyParameters.add(new Map<String, Object>{
+                'type' => 'text',
+                'text' => (p != null ? p : '-')
+            });
+        }
+        return JSON.serialize(new Map<String, Object>{
+            'messaging_product' => 'whatsapp',
+            'to'   => to,
+            'type' => 'template',
+            'template' => new Map<String, Object>{
+                'name'     => templateName,
+                'language' => new Map<String, Object>{ 'code' => 'en_US' },
+                'components' => new List<Object>{
+                    new Map<String, Object>{
+                        'type'       => 'header',
+                        'parameters' => new List<Object>{
+                            new Map<String, Object>{
+                                'type' => 'text',
+                                'text' => (headerText != null ? headerText : '-')
+                            }
+                        }
+                    },
+                    new Map<String, Object>{
+                        'type'       => 'body',
+                        'parameters' => bodyParameters
+                    }
+                }
+            }
+        });
+    }
+
     private static String buildPayloadWithImageHeader(
         String to, String templateName, String headerImageUrl, List<String> params
     ) {
@@ -142,7 +182,8 @@ public class WhatsAppHelper {
     // ════════════════════════════════════════════════════════════════════════
     // 1b. ORDER PENDING — first web order from an unknown customer
     // Template: order_pending_review
-    // {{1}} name, {{2}} order#, {{3}} website login code
+    // Header {{1}} website login code — body {{1}} name, {{2}} order#
+    // Header and body number their variables independently.
     // ════════════════════════════════════════════════════════════════════════
     @future(callout=true)
     public static void sendOrderPending(
@@ -150,11 +191,12 @@ public class WhatsAppHelper {
     ) {
         String p = fmtPhone(phone);
         if (p == null) return;
-        sendMessage(buildPayload(p, 'order_pending_review',
+        sendMessage(buildPayloadWithTextHeader(
+            p, 'order_pending_review',
+            String.isBlank(businessCode) ? '-' : businessCode,
             new List<String>{
                 String.isBlank(clientName) ? 'there' : clientName,
-                String.isBlank(saleName) ? '-' : saleName,
-                String.isBlank(businessCode) ? '-' : businessCode
+                String.isBlank(saleName) ? '-' : saleName
             }));
     }
 
