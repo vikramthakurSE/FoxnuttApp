@@ -110,7 +110,8 @@ public class SaleLineItemHelper {
             SELECT Id, Name, Order_Status__c,
                    Expected_Delivery_Date__c,
                    Client__r.Name,
-                   Client__r.Phone
+                   Client__r.Phone,
+                   Client__r.Unique_Business_Code__c
             FROM Sale__c
             WHERE Id IN :saleIds
         ];

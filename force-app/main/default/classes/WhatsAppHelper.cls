@@ -142,18 +142,19 @@ public class WhatsAppHelper {
     // ════════════════════════════════════════════════════════════════════════
     // 1b. ORDER PENDING — first web order from an unknown customer
     // Template: order_pending_review
-    // {{1}} name, {{2}} order#
+    // {{1}} name, {{2}} order#, {{3}} website login code
     // ════════════════════════════════════════════════════════════════════════
     @future(callout=true)
     public static void sendOrderPending(
-        String phone, String clientName, String saleName
+        String phone, String clientName, String saleName, String businessCode
     ) {
         String p = fmtPhone(phone);
         if (p == null) return;
         sendMessage(buildPayload(p, 'order_pending_review',
             new List<String>{
                 String.isBlank(clientName) ? 'there' : clientName,
-                String.isBlank(saleName) ? '-' : saleName
+                String.isBlank(saleName) ? '-' : saleName,
+                String.isBlank(businessCode) ? '-' : businessCode
             }));
     }
 
@@ -301,7 +302,10 @@ public class WhatsAppHelper {
     public static void dispatchOrderPending(List<Sale__c> sales) {
         for (Sale__c s : sales) {
             if (String.isBlank(s.Client__r?.Phone)) continue;
-            sendOrderPending(s.Client__r.Phone, s.Client__r.Name, s.Name);
+            sendOrderPending(
+                s.Client__r.Phone, s.Client__r.Name, s.Name,
+                s.Client__r.Unique_Business_Code__c
+            );
         }
     }
 
