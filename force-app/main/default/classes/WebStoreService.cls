@@ -33,6 +33,22 @@ public without sharing class WebStoreService {
         public String orderRef;       // idempotency key from the website
         public List<OrderItemInput> items;
     }
+    public class RegisterInput {
+        public String name;
+        public String phone;
+        public String address;   // street, optional
+        public String locality;
+        public String city;
+        public String state;
+        public String pincode;
+        public String gstin;     // optional
+    }
+    public class RegisterResult {
+        public String  accountId;
+        public String  accountName;
+        public String  businessCode;
+        public Boolean alreadyRegistered;
+    }
     public class OrderResult {
         public String  saleId;
         public String  saleName;
@@ -119,6 +135,101 @@ public without sharing class WebStoreService {
             taken.add(code.toUpperCase());
             a.Unique_Business_Code__c = code;
         }
+    }
+
+    /**
+     * Resend a client's login code to their WhatsApp.
+     *
+     * Returns false when the number is not on any account, so the website can
+     * offer to register them. The code itself is never returned to the
+     * browser: anyone could otherwise type a number they do not own and read
+     * back that client's credential.
+     */
+    public static Boolean requestCodeByPhone(String rawPhone) {
+        String digits = normalizePhone(rawPhone);
+        if (digits == null) return false;
+
+        Account a = findClientByPhone(digits);
+        if (a == null || String.isBlank(a.Unique_Business_Code__c)) return false;
+
+        WhatsAppHelper.sendBusinessCode(
+            a.Phone, a.Name, a.Unique_Business_Code__c
+        );
+        return true;
+    }
+
+    /**
+     * Register a walk-up customer from the website.
+     *
+     * An existing account for the same number is returned as-is rather than
+     * duplicated — someone who forgot they were already registered should end
+     * up back in their own account, not a second one.
+     */
+    public static RegisterResult registerClient(RegisterInput input) {
+        if (input == null) throw new WebStoreException('No details supplied.');
+
+        String digits = normalizePhone(input.phone);
+        if (digits == null)
+            throw new WebStoreException('A valid 10-digit mobile number is required.');
+        if (String.isBlank(input.name))
+            throw new WebStoreException('Name is required.');
+        if (String.isBlank(input.locality))
+            throw new WebStoreException('Locality is required.');
+        if (String.isBlank(input.city))
+            throw new WebStoreException('City is required.');
+        if (String.isBlank(input.state))
+            throw new WebStoreException('State is required.');
+        if (String.isBlank(input.pincode)
+            || !Pattern.matches('^[1-9][0-9]{5}$', input.pincode.trim()))
+            throw new WebStoreException('Enter a valid 6-digit PIN code.');
+
+        RegisterResult out = new RegisterResult();
+
+        Account existing = findClientByPhone(digits);
+        if (existing != null) {
+            out.accountId         = existing.Id;
+            out.accountName       = existing.Name;
+            out.businessCode      = existing.Unique_Business_Code__c;
+            out.alreadyRegistered = true;
+            return out;
+        }
+
+        Id clientRT = clientRecordTypeId();
+        Account a = new Account(
+            Name                  = left(input.name.trim(), 255),
+            Contact_Person__c     = left(input.name.trim(), 50),
+            Phone                 = '+91' + digits,
+            Phone_Digits__c       = digits,
+            AccountSource         = 'Web',
+            Locality__c           = left(input.locality, 100),
+            BillingStreet         = left(input.address, 255),
+            BillingCity           = left(input.city, 40),
+            BillingState          = left(input.state, 80),
+            BillingPostalCode     = left(input.pincode, 20),
+            BillingCountry        = 'India',
+            ShippingStreet        = left(input.address, 255),
+            ShippingCity          = left(input.city, 40),
+            ShippingState         = left(input.state, 80),
+            ShippingPostalCode    = left(input.pincode, 20),
+            ShippingCountry       = 'India',
+            GSTIN__c              = left(input.gstin, 15),
+            First_Date_Visited__c = Date.today()
+        );
+        if (clientRT != null) a.RecordTypeId = clientRT;
+
+        // AccountTrigger stamps the code before insert and sends the welcome
+        // WhatsApp after, so nothing else is needed here.
+        insert a;
+
+        Account saved = [
+            SELECT Id, Name, Unique_Business_Code__c
+            FROM Account WHERE Id = :a.Id LIMIT 1
+        ];
+        out.accountId         = saved.Id;
+        out.accountName       = saved.Name;
+        out.businessCode      = saved.Unique_Business_Code__c;
+        out.alreadyRegistered = false;
+        return out;
     }
 
     /** Look up a client by their website login code. */
@@ -451,7 +562,7 @@ public without sharing class WebStoreService {
     public static Account findClientByPhone(String digits) {
         // Fast path: indexed external-id field
         List<Account> hits = [
-            SELECT Id, Name, Phone, Phone_Digits__c
+            SELECT Id, Name, Phone, Phone_Digits__c, Unique_Business_Code__c
             FROM Account
             WHERE Phone_Digits__c = :digits
             ORDER BY LastModifiedDate DESC
@@ -461,7 +572,7 @@ public without sharing class WebStoreService {
 
         // Fallback: scan accounts whose Phone_Digits__c hasn't been backfilled
         for (Account a : [
-            SELECT Id, Name, Phone, Phone_Digits__c
+            SELECT Id, Name, Phone, Phone_Digits__c, Unique_Business_Code__c
             FROM Account
             WHERE Phone != null AND Phone_Digits__c = null
             LIMIT 500

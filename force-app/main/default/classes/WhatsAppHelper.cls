@@ -180,6 +180,28 @@ public class WhatsAppHelper {
     }
 
     // ════════════════════════════════════════════════════════════════════════
+    // 1c. BUSINESS CODE RESEND — client asked for their code on the website
+    // ════════════════════════════════════════════════════════════════════════
+    /** Reuses the approved welcome template, which already carries {{1}} name
+     *  and {{2}} code. Point this at a dedicated template once one is
+     *  approved in Meta — the wording reads oddly for a long-standing client
+     *  asking for their code back. */
+    private static final String CODE_RESEND_TEMPLATE = 'welcome_new_client';
+
+    @future(callout=true)
+    public static void sendBusinessCode(
+        String phone, String clientName, String businessCode
+    ) {
+        String p = fmtPhone(phone);
+        if (p == null) return;
+        sendMessage(buildPayload(p, CODE_RESEND_TEMPLATE,
+            new List<String>{
+                String.isBlank(clientName) ? 'there' : clientName,
+                String.isBlank(businessCode) ? '-' : businessCode
+            }));
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
     // 1b. ORDER PENDING — first web order from an unknown customer
     // Template: order_pending_review
     // Header {{1}} website login code — body {{1}} name, {{2}} order#

@@ -72,7 +72,36 @@ global with sharing class WebStoreAPI {
         RestResponse res = RestContext.response;
         res.addHeader('Content-Type', 'application/json');
         try {
-            if (!req.requestURI.toLowerCase().contains('/orders')) {
+            String path = req.requestURI.toLowerCase();
+
+            // Resend an existing client's login code to their WhatsApp.
+            if (path.contains('/request-code')) {
+                Map<String, Object> body =
+                    (Map<String, Object>) JSON.deserializeUntyped(
+                        req.requestBody.toString());
+                Boolean sent = WebStoreService.requestCodeByPhone(
+                    (String) body.get('phone'));
+                // 200 either way: the website needs to tell "not registered"
+                // apart from "the service is down".
+                respond(res, 200, new Map<String, Object>{ 'sent' => sent });
+                return;
+            }
+
+            // Register a walk-up customer.
+            if (path.contains('/register')) {
+                WebStoreService.RegisterInput reg =
+                    (WebStoreService.RegisterInput) JSON.deserialize(
+                        req.requestBody.toString(),
+                        WebStoreService.RegisterInput.class
+                    );
+                WebStoreService.RegisterResult result =
+                    WebStoreService.registerClient(reg);
+                respond(res, result.alreadyRegistered ? 200 : 201,
+                        new Map<String, Object>{ 'account' => result });
+                return;
+            }
+
+            if (!path.contains('/orders')) {
                 respond(res, 404, error('Unknown resource.'));
                 return;
             }

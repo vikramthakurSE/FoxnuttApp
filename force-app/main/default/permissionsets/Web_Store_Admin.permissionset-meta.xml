@@ -74,6 +74,11 @@
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
+        <field>Account.Locality__c</field>
+        <editable>true</editable>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
         <field>Account.Phone_Digits__c</field>
         <editable>true</editable>
         <readable>true</readable>
