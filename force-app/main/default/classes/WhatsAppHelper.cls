@@ -169,18 +169,15 @@ public class WhatsAppHelper {
     // Template: welcome_new_client  |  {{1}} = client name
     // ════════════════════════════════════════════════════════════════════════
     @future(callout=true)
-    public static void sendWelcome(
-        String phone, String clientName, String businessCode
-    ) {
+    public static void sendWelcome(String phone, String clientName) {
         String p = fmtPhone(phone);
         if (p == null) return;
-        // {{2}} carries the website login code. The welcome_new_client
-        // template must be edited in Meta to add it, or the send is
-        // rejected for a parameter-count mismatch.
+        // welcome_new_client carries only {{1}} the client's name. The
+        // business ID is deliberately kept out of the welcome and sent by
+        // order_pending_review or business_id_request instead.
         sendMessage(buildPayload(p, 'welcome_new_client',
             new List<String>{
-                clientName,
-                String.isBlank(businessCode) ? '-' : businessCode
+                String.isBlank(clientName) ? 'there' : clientName
             }));
     }
 
@@ -387,7 +384,7 @@ public class WhatsAppHelper {
     public static void dispatchWelcome(List<Account> accounts) {
         for (Account a : accounts) {
             if (String.isBlank(a.Phone)) continue;
-            sendWelcome(a.Phone, a.Name, a.Unique_Business_Code__c);
+            sendWelcome(a.Phone, a.Name);
         }
     }
 
