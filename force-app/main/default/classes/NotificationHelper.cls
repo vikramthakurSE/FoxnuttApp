@@ -152,6 +152,27 @@ public class NotificationHelper {
     }
 
     // ════════════════════════════════════════════════════════════════════════
+    // 2b. ORDER MODIFIED BY THE CUSTOMER (from the website)
+    // ════════════════════════════════════════════════════════════════════════
+    public static void notifyOrderModified(
+        Id saleId, String saleName, String clientName,
+        Decimal oldTotal, Decimal newTotal, Boolean returnedForApproval
+    ) {
+        Decimal wasTotal = oldTotal != null ? oldTotal : 0;
+        Decimal nowTotal = newTotal != null ? newTotal : 0;
+        String  body = clientName + ' · ₹' + wasTotal.setScale(0) +
+                       ' → ₹' + nowTotal.setScale(0) +
+                       (returnedForApproval ? ' · needs re-approval' : '');
+        send(
+            TYPE_STATUS_CHANGED,
+            (returnedForApproval ? '⚠️ ' : '✏️ ') + saleName +
+                ' — modified by customer',
+            body,
+            saleId
+        );
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
     // 3. PAYMENT RECEIVED
     // ════════════════════════════════════════════════════════════════════════
     public static void notifyPaymentReceived(

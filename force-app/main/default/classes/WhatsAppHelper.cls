@@ -33,6 +33,11 @@ public class WhatsAppHelper {
         }
     }
 
+    /** Header value for templates that show the client's login code. */
+    private static String hdr(String businessCode) {
+        return String.isBlank(businessCode) ? '-' : businessCode;
+    }
+
     // ── Format phone ───────────────────────────────────────────────────────
     private static String fmtPhone(String raw) {
         if (String.isBlank(raw)) return null;
@@ -230,15 +235,13 @@ public class WhatsAppHelper {
     @future(callout=true)
     public static void sendOrderConfirmed(
         String phone, String clientName, String saleName,
-        String products, String total, String deliveryDate
+        String products, String total, String deliveryDate,
+        String businessCode
     ) {
         String p = fmtPhone(phone);
         if (p == null) return;
-        // order_confirmed was approved with an IMAGE header, so it must be
-        // sent with a header image or Meta rejects it (error 132012). Reuse
-        // the shared header image used by the follow-up template.
-        sendMessage(buildPayloadWithImageHeader(
-            p, 'order_confirmed', FOLLOWUP_HEADER_IMAGE_URL,
+        sendMessage(buildPayloadWithTextHeader(
+            p, 'order_confirmed', hdr(businessCode),
             new List<String>{ clientName, saleName,
                               products, total, deliveryDate }));
     }
@@ -251,11 +254,12 @@ public class WhatsAppHelper {
     @future(callout=true)
     public static void sendOutForDelivery(
         String phone, String clientName,
-        String saleName, String balance
+        String saleName, String balance, String businessCode
     ) {
         String p = fmtPhone(phone);
         if (p == null) return;
-        sendMessage(buildPayload(p, 'order_out_for_delivery',
+        sendMessage(buildPayloadWithTextHeader(
+            p, 'order_out_for_delivery', hdr(businessCode),
             new List<String>{ clientName, saleName, balance }));
     }
 
@@ -267,11 +271,13 @@ public class WhatsAppHelper {
     @future(callout=true)
     public static void sendOrderDelivered(
         String phone, String clientName, String saleName,
-        String total, String collected, String balance
+        String total, String collected, String balance,
+        String businessCode
     ) {
         String p = fmtPhone(phone);
         if (p == null) return;
-        sendMessage(buildPayload(p, 'order_delivered',
+        sendMessage(buildPayloadWithTextHeader(
+            p, 'order_delivered', hdr(businessCode),
             new List<String>{ clientName, saleName,
                               total, collected, balance }));
     }
@@ -283,12 +289,31 @@ public class WhatsAppHelper {
     // ════════════════════════════════════════════════════════════════════════
     @future(callout=true)
     public static void sendOrderCancelled(
-        String phone, String clientName, String saleName
+        String phone, String clientName, String saleName,
+        String businessCode
     ) {
         String p = fmtPhone(phone);
         if (p == null) return;
-        sendMessage(buildPayload(p, 'order_cancelled',
+        sendMessage(buildPayloadWithTextHeader(
+            p, 'order_cancelled', hdr(businessCode),
             new List<String>{ clientName, saleName }));
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // 5b. ORDER MODIFIED — customer changed a live order on the website
+    // Template: order_modified — header {{1}} login code
+    // Body {{1}} name, {{2}} order#, {{3}} products, {{4}} new total
+    // ════════════════════════════════════════════════════════════════════════
+    @future(callout=true)
+    public static void sendOrderModified(
+        String phone, String clientName, String saleName,
+        String products, String total, String businessCode
+    ) {
+        String p = fmtPhone(phone);
+        if (p == null) return;
+        sendMessage(buildPayloadWithTextHeader(
+            p, 'order_modified', hdr(businessCode),
+            new List<String>{ clientName, saleName, products, total }));
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -299,11 +324,12 @@ public class WhatsAppHelper {
     @future(callout=true)
     public static void sendPaymentReceived(
         String phone, String clientName, String amount,
-        String saleName, String remainingBalance
+        String saleName, String remainingBalance, String businessCode
     ) {
         String p = fmtPhone(phone);
         if (p == null) return;
-        sendMessage(buildPayload(p, 'payment_received',
+        sendMessage(buildPayloadWithTextHeader(
+            p, 'payment_received', hdr(businessCode),
             new List<String>{ clientName, amount,
                               saleName, remainingBalance }));
     }
@@ -342,11 +368,12 @@ public class WhatsAppHelper {
     @future(callout=true)
     public static void sendPaymentFollowUp(
         String phone, String clientName, String amountDue,
-        String saleName, String daysPending
+        String saleName, String daysPending, String businessCode
     ) {
         String p = fmtPhone(phone);
         if (p == null) return;
-        sendMessage(buildPayload(p, 'payment_followup_reminder',
+        sendMessage(buildPayloadWithTextHeader(
+            p, 'payment_followup_reminder', hdr(businessCode),
             new List<String>{ clientName, amountDue,
                               saleName, daysPending }));
     }
@@ -404,7 +431,8 @@ public class WhatsAppHelper {
                 s.Client__r.Phone, s.Client__r.Name, s.Name,
                 products,
                 total.setScale(2).format(),
-                delivery
+                delivery,
+                s.Client__r.Unique_Business_Code__c
             );
         }
     }
@@ -422,18 +450,21 @@ public class WhatsAppHelper {
             if (status == 'Out for Delivery') {
                 sendOutForDelivery(
                     s.Client__r.Phone, s.Client__r.Name, s.Name,
-                    bal.setScale(0).format()
+                    bal.setScale(0).format(),
+                    s.Client__r.Unique_Business_Code__c
                 );
             } else if (status == 'Delivered') {
                 sendOrderDelivered(
                     s.Client__r.Phone, s.Client__r.Name, s.Name,
                     'Rs ' + rev.setScale(0).format(),
                     'Rs ' + col.setScale(0).format(),
-                    bal.setScale(0).format()
+                    bal.setScale(0).format(),
+                    s.Client__r.Unique_Business_Code__c
                 );
             } else if (status == 'Cancelled') {
                 sendOrderCancelled(
-                    s.Client__r.Phone, s.Client__r.Name, s.Name
+                    s.Client__r.Phone, s.Client__r.Name, s.Name,
+                    s.Client__r.Unique_Business_Code__c
                 );
             }
         }
@@ -455,7 +486,8 @@ public class WhatsAppHelper {
                 s.Client__r.Phone, s.Client__r.Name,
                 amt.setScale(0).format(),
                 s.Name,
-                bal.setScale(0).format()
+                bal.setScale(0).format(),
+                s.Client__r.Unique_Business_Code__c
             );
         }
     }
@@ -468,7 +500,8 @@ public class WhatsAppHelper {
     public static void dispatchPaymentReceivedAsync(Set<Id> paymentIds) {
         for (Client_Payment__c p : [
             SELECT Amount__c, Sale__r.Name, Sale__r.Balance_Due__c,
-                   Sale__r.Client__r.Name, Sale__r.Client__r.Phone
+                   Sale__r.Client__r.Name, Sale__r.Client__r.Phone,
+                   Sale__r.Client__r.Unique_Business_Code__c
             FROM Client_Payment__c
             WHERE Id IN :paymentIds
         ]) {
@@ -483,7 +516,8 @@ public class WhatsAppHelper {
                           ? p.Sale__r.Balance_Due__c : 0;
             if (bal < 0) bal = 0;   // a CD over-settlement shows as ₹0, not negative
 
-            sendMessage(buildPayload(ph, 'payment_received',
+            sendMessage(buildPayloadWithTextHeader(ph, 'payment_received',
+                hdr(p.Sale__r.Client__r.Unique_Business_Code__c),
                 new List<String>{
                     p.Sale__r.Client__r.Name,
                     amt.setScale(0).format(),
@@ -530,13 +564,13 @@ public class WhatsAppHelper {
 
     // ── 8. Payment Follow-Up — called from PaymentReminderHelper ───────────
     public static void dispatchPaymentFollowUp(
-        String phone, String clientName,
-        String amountDue, String saleName, Integer daysOld
+        String phone, String clientName, String amountDue,
+        String saleName, Integer daysOld, String businessCode
     ) {
         if (String.isBlank(phone)) return;
         sendPaymentFollowUp(
             phone, clientName, amountDue,
-            saleName, String.valueOf(daysOld)
+            saleName, String.valueOf(daysOld), businessCode
         );
     }
 }

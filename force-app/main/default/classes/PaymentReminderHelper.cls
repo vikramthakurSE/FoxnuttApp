@@ -15,12 +15,14 @@ public class PaymentReminderHelper {
         Map<Id, Date>    oldestDueByClient = new Map<Id, Date>();
         Map<Id, String>  saleNameByClient  = new Map<Id, String>();
         Map<Id, String>  phoneByClient     = new Map<Id, String>();
+        Map<Id, String>  codeByClient      = new Map<Id, String>();
         Map<Id, String>  nameByClient      = new Map<Id, String>();
 
         for (Sale__c s : [
             SELECT Id, Name, Client__c, Sale_Date__c,
                    Balance_Due__c,
-                   Client__r.Name, Client__r.Phone
+                   Client__r.Name, Client__r.Phone,
+                   Client__r.Unique_Business_Code__c
             FROM Sale__c
             WHERE Order_Status__c = 'Delivered'
             AND Balance_Due__c > 0
@@ -40,6 +42,7 @@ public class PaymentReminderHelper {
             }
             phoneByClient.put(cId, s.Client__r.Phone);
             nameByClient.put(cId, s.Client__r.Name);
+            codeByClient.put(cId, s.Client__r.Unique_Business_Code__c);
         }
 
         if (balanceByClient.isEmpty()) return;
@@ -91,7 +94,7 @@ public class PaymentReminderHelper {
                 WhatsAppHelper.dispatchPaymentFollowUp(
                     phone, clientName,
                     balance.setScale(0).format(),
-                    saleName, daysOld
+                    saleName, daysOld, codeByClient.get(clientId)
                 );
             }
         }

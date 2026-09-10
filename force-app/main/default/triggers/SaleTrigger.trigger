@@ -36,7 +36,8 @@ trigger SaleTrigger on Sale__c (after insert, after update, before delete) {
             List<Sale__c> approvedSales = [
                 SELECT Id, Name, Order_Status__c,
                        Expected_Delivery_Date__c,
-                       Client__r.Name, Client__r.Phone
+                       Client__r.Name, Client__r.Phone,
+                       Client__r.Unique_Business_Code__c
                 FROM Sale__c WHERE Id IN :approvedNow
             ];
             Map<Id, List<Sale_Line_Item__c>> approvedLiMap =
@@ -67,7 +68,8 @@ trigger SaleTrigger on Sale__c (after insert, after update, before delete) {
                        Total_Revenue__c, Total_Profit__c,
                        Total_Collected__c, Balance_Due__c,
                        Payment_Status__c,
-                       Client__r.Name, Client__r.Phone
+                       Client__r.Name, Client__r.Phone,
+                       Client__r.Unique_Business_Code__c
                 FROM Sale__c WHERE Id IN :statusChanged
             ];
 

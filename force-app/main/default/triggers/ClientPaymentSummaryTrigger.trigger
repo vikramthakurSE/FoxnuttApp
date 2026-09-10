@@ -24,7 +24,8 @@ trigger ClientPaymentSummaryTrigger on Client_Payment__c (
         if (!saleIds.isEmpty()) {
             Map<Id, Sale__c> saleMap = new Map<Id, Sale__c>([
                 SELECT Id, Name, Balance_Due__c,
-                       Client__r.Name, Client__r.Phone
+                       Client__r.Name, Client__r.Phone,
+                       Client__r.Unique_Business_Code__c
                 FROM Sale__c WHERE Id IN :saleIds
             ]);
             WhatsAppHelper.dispatchPaymentReceived(Trigger.new, saleMap);

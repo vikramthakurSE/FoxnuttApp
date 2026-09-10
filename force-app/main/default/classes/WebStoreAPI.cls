@@ -101,6 +101,42 @@ global with sharing class WebStoreAPI {
                 return;
             }
 
+            // Customer cancels their own order.
+            if (path.contains('/cancel-order')) {
+                Map<String, Object> body =
+                    (Map<String, Object>) JSON.deserializeUntyped(
+                        req.requestBody.toString());
+                WebStoreService.OrderEditResult r =
+                    WebStoreService.cancelOrder(
+                        (String) body.get('businessCode'),
+                        (Id) body.get('saleId'));
+                respond(res, 200, new Map<String, Object>{ 'order' => r });
+                return;
+            }
+
+            // Customer changes quantities on their own order.
+            if (path.contains('/modify-order')) {
+                Map<String, Object> body =
+                    (Map<String, Object>) JSON.deserializeUntyped(
+                        req.requestBody.toString());
+                Map<Id, Integer> packets = new Map<Id, Integer>();
+                Object raw = body.get('lines');
+                if (raw instanceof Map<String, Object>) {
+                    for (String lineId :
+                         ((Map<String, Object>) raw).keySet()) {
+                        Object v = ((Map<String, Object>) raw).get(lineId);
+                        packets.put((Id) lineId, Integer.valueOf(v));
+                    }
+                }
+                WebStoreService.OrderEditResult r =
+                    WebStoreService.modifyOrder(
+                        (String) body.get('businessCode'),
+                        (Id) body.get('saleId'),
+                        packets);
+                respond(res, 200, new Map<String, Object>{ 'order' => r });
+                return;
+            }
+
             if (!path.contains('/orders')) {
                 respond(res, 404, error('Unknown resource.'));
                 return;

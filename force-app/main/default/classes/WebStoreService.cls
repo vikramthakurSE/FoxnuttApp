@@ -232,6 +232,230 @@ public without sharing class WebStoreService {
         return out;
     }
 
+    /** Statuses a customer may still change their own order from. */
+    private static final Set<String> CUSTOMER_EDITABLE = new Set<String>{
+        'Pending Approval', 'Confirmed'
+    };
+
+    /** A confirmed order growing beyond this multiple goes back for review. */
+    private static final Decimal REAPPROVAL_GROWTH = 1.25;
+
+    public class OrderEditResult {
+        @AuraEnabled public String  saleName { get; set; }
+        @AuraEnabled public String  status   { get; set; }
+        @AuraEnabled public Decimal total    { get; set; }
+        @AuraEnabled public Boolean returnedForApproval { get; set; }
+    }
+
+    /**
+     * Load a sale that the given client is allowed to act on.
+     *
+     * The code decides ownership, not the sale id: without this check anyone
+     * could guess a sale id and cancel a stranger's order.
+     */
+    private static Sale__c ownedSale(String businessCode, Id saleId) {
+        Account a = findClientByCode(businessCode);
+        if (a == null) throw new WebStoreException('Please log in again.');
+
+        List<Sale__c> rows = [
+            SELECT Id, Name, Order_Status__c, Total_Revenue__c, Client__c,
+                   Client__r.Name, Client__r.Phone,
+                   Client__r.Unique_Business_Code__c
+            FROM Sale__c
+            WHERE Id = :saleId AND Client__c = :a.Id
+            LIMIT 1
+        ];
+        if (rows.isEmpty())
+            throw new WebStoreException('We could not find that order.');
+
+        Sale__c sale = rows[0];
+        if (!CUSTOMER_EDITABLE.contains(sale.Order_Status__c)) {
+            throw new WebStoreException(
+                'Order ' + sale.Name + ' is already ' + sale.Order_Status__c +
+                ' and can no longer be changed. Please call us instead.'
+            );
+        }
+        return sale;
+    }
+
+    /** Customer cancels their own order. SaleTrigger sends the WhatsApp. */
+    public static OrderEditResult cancelOrder(String businessCode, Id saleId) {
+        Sale__c sale = ownedSale(businessCode, saleId);
+        update new Sale__c(Id = sale.Id, Order_Status__c = 'Cancelled');
+
+        OrderEditResult r = new OrderEditResult();
+        r.saleName = sale.Name;
+        r.status   = 'Cancelled';
+        r.total    = sale.Total_Revenue__c;
+        r.returnedForApproval = false;
+        return r;
+    }
+
+    /**
+     * Customer changes quantities on their own order, or drops lines by
+     * sending zero. Products cannot be added here — a different product is a
+     * different order.
+     */
+    public static OrderEditResult modifyOrder(
+        String businessCode, Id saleId, Map<Id, Integer> packetsByLineId
+    ) {
+        Sale__c sale = ownedSale(businessCode, saleId);
+        if (packetsByLineId == null || packetsByLineId.isEmpty())
+            throw new WebStoreException('No changes were supplied.');
+
+        List<Sale_Line_Item__c> lines = [
+            SELECT Id, Sale__c, Brand__c, Packet_Type__c, Quantity__c,
+                   Rate_Per_Kg__c
+            FROM Sale_Line_Item__c
+            WHERE Sale__c = :sale.Id
+        ];
+        Map<Id, Sale_Line_Item__c> byId = new Map<Id, Sale_Line_Item__c>(lines);
+
+        // Pack size comes from the product, so a line whose product was
+        // retired since the order cannot be re-quantified here.
+        Map<String, Decimal> gramsByKey = new Map<String, Decimal>();
+        for (Web_Product__c wp : [
+            SELECT Brand__c, Packet_Type__c, Pack_Size_Grams__c
+            FROM Web_Product__c
+        ]) {
+            gramsByKey.put(wp.Brand__c + '|' + wp.Packet_Type__c,
+                           wp.Pack_Size_Grams__c);
+        }
+
+        List<Sale_Line_Item__c> toUpdate = new List<Sale_Line_Item__c>();
+        List<Sale_Line_Item__c> toDelete = new List<Sale_Line_Item__c>();
+        Map<String, Decimal> requestedKg = new Map<String, Decimal>();
+        Decimal newTotal = 0;
+
+        for (Sale_Line_Item__c li : lines) {
+            Integer packets = packetsByLineId.containsKey(li.Id)
+                ? packetsByLineId.get(li.Id) : null;
+            if (packets == null) {
+                // Untouched line: still counts toward stock and total.
+                Decimal kg = li.Quantity__c != null ? li.Quantity__c : 0;
+                requestedKg.put(li.Brand__c + '|' + li.Packet_Type__c,
+                    kg + zeroIfNull(requestedKg.get(
+                        li.Brand__c + '|' + li.Packet_Type__c)));
+                newTotal += kg * zeroIfNull(li.Rate_Per_Kg__c);
+                continue;
+            }
+            if (packets < 0)
+                throw new WebStoreException('Quantities cannot be negative.');
+            if (packets == 0) { toDelete.add(li); continue; }
+
+            String key = li.Brand__c + '|' + li.Packet_Type__c;
+            Decimal grams = gramsByKey.get(key);
+            if (grams == null || grams <= 0)
+                throw new WebStoreException(
+                    li.Brand__c + ' can no longer be changed online. ' +
+                    'Please call us to adjust this order.');
+
+            Decimal kg = packets * grams / 1000;
+            li.Quantity__c = kg;
+            toUpdate.add(li);
+            requestedKg.put(key, kg + zeroIfNull(requestedKg.get(key)));
+            newTotal += kg * zeroIfNull(li.Rate_Per_Kg__c);
+        }
+
+        if (toUpdate.isEmpty() && toDelete.isEmpty())
+            throw new WebStoreException('Nothing changed on that order.');
+        if (toDelete.size() == lines.size())
+            throw new WebStoreException(
+                'An order needs at least one item. Cancel it instead.');
+
+        // Availability already counts this sale's own lines as blocked, so
+        // add them back before comparing — otherwise the order competes with
+        // itself and any increase looks like it exceeds stock.
+        Map<String, Decimal> available = availableByKey();
+        for (Sale_Line_Item__c li : lines) {
+            String key = li.Brand__c + '|' + li.Packet_Type__c;
+            available.put(key,
+                zeroIfNull(available.get(key)) + zeroIfNull(li.Quantity__c));
+        }
+        for (String key : requestedKg.keySet()) {
+            Decimal have = zeroIfNull(available.get(key));
+            if (requestedKg.get(key) > have) {
+                throw new WebStoreException(
+                    'Not enough stock for ' + key.substringBefore('|') +
+                    '. Available: ' + have.setScale(2) + ' KG.');
+            }
+        }
+
+        Savepoint sp = Database.setSavepoint();
+        try {
+            if (!toUpdate.isEmpty()) update toUpdate;
+            if (!toDelete.isEmpty()) delete toDelete;
+
+            Decimal oldTotal = zeroIfNull(sale.Total_Revenue__c);
+            Boolean grewALot = sale.Order_Status__c == 'Confirmed'
+                && oldTotal > 0
+                && newTotal > oldTotal * REAPPROVAL_GROWTH;
+
+            String newStatus = sale.Order_Status__c;
+            if (grewALot) {
+                newStatus = 'Pending Approval';
+                update new Sale__c(
+                    Id = sale.Id, Order_Status__c = 'Pending Approval');
+            }
+
+            // Tell the customer what their order now says, and tell the
+            // office. Neither is fired by a trigger: the status usually has
+            // not changed, only the lines beneath it.
+            String products = '';
+            for (Sale_Line_Item__c li : toUpdate) {
+                if (products != '') products += ', ';
+                products += li.Brand__c + ' ' +
+                    li.Quantity__c.setScale(2) + ' KG';
+            }
+            if (String.isBlank(products)) products = 'Updated items';
+
+            if (String.isNotBlank(sale.Client__r?.Phone)) {
+                WhatsAppHelper.sendOrderModified(
+                    sale.Client__r.Phone, sale.Client__r.Name, sale.Name,
+                    products, 'Rs ' + newTotal.setScale(0).format(),
+                    sale.Client__r.Unique_Business_Code__c
+                );
+            }
+            NotificationHelper.notifyOrderModified(
+                sale.Id, sale.Name, sale.Client__r?.Name,
+                oldTotal, newTotal, grewALot
+            );
+
+            OrderEditResult r = new OrderEditResult();
+            r.saleName = sale.Name;
+            r.status   = newStatus;
+            r.total    = newTotal.setScale(2);
+            r.returnedForApproval = grewALot;
+            return r;
+        } catch (WebStoreException e) {
+            Database.rollback(sp);
+            throw e;
+        } catch (Exception e) {
+            Database.rollback(sp);
+            throw new WebStoreException(e.getMessage());
+        }
+    }
+
+    private static Decimal zeroIfNull(Decimal d) {
+        return d == null ? 0 : d;
+    }
+
+    /**
+     * True once a human has stood behind at least one of this client's
+     * orders. Pending and cancelled sales prove nothing: the first was never
+     * reviewed, and the second was reviewed and rejected.
+     */
+    public static Boolean hasApprovedHistory(Id clientId) {
+        if (clientId == null) return false;
+        return 0 < [
+            SELECT COUNT()
+            FROM Sale__c
+            WHERE Client__c = :clientId
+            AND Order_Status__c NOT IN ('Pending Approval', 'Cancelled')
+            LIMIT 1
+        ];
+    }
+
     /** Look up a client by their website login code. */
     public static Account findClientByCode(String code) {
         if (String.isBlank(code)) return null;
@@ -414,11 +638,12 @@ public without sharing class WebStoreService {
                 insert client;   // AccountTrigger sends the WhatsApp welcome
             }
 
-            // A known client's order goes live at once: stock is blocked and
-            // the confirmation WhatsApp goes out. A first-time customer waits
-            // for a human to vet them, since nothing yet ties that phone to a
-            // real business.
-            String status = isNew ? 'Pending Approval' : 'Confirmed';
+            // Vetting follows the client's history, not whether this call
+            // created their account. Someone who registered on the website
+            // minutes ago is just as unvetted as someone whose account was
+            // created by their first order, so both wait for a human.
+            String status = hasApprovedHistory(client.Id)
+                ? 'Confirmed' : 'Pending Approval';
 
             Sale__c sale = new Sale__c(
                 Client__c          = client.Id,
@@ -489,7 +714,7 @@ public without sharing class WebStoreService {
                    Payment_Status__c, Total_Revenue__c, Total_Collected__c,
                    Balance_Due__c, Expected_Delivery_Date__c,
                    Web_Order_Ref__c,
-                   (SELECT Brand__c, Packet_Type__c, Quantity__c,
+                   (SELECT Id, Brand__c, Packet_Type__c, Quantity__c,
                            Rate_Per_Kg__c, Packet_Count__c, Line_Amount__c
                     FROM Sale_Line_Items__r)
             FROM Sale__c
@@ -500,6 +725,8 @@ public without sharing class WebStoreService {
             List<Map<String, Object>> items = new List<Map<String, Object>>();
             for (Sale_Line_Item__c li : s.Sale_Line_Items__r) {
                 items.add(new Map<String, Object>{
+                    // The website needs the line id to change a quantity.
+                    'lineId'      => li.Id,
                     'brand'       => li.Brand__c,
                     'packetType'  => li.Packet_Type__c,
                     'quantityKg'  => li.Quantity__c,
@@ -509,6 +736,8 @@ public without sharing class WebStoreService {
                 });
             }
             out.add(new Map<String, Object>{
+                // Whether the customer may still change this themselves.
+                'editable'      => CUSTOMER_EDITABLE.contains(s.Order_Status__c),
                 'saleId'        => s.Id,
                 'saleName'      => s.Name,
                 'orderRef'      => s.Web_Order_Ref__c,
