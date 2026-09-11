@@ -183,12 +183,12 @@ public class WhatsAppHelper {
 
     // ════════════════════════════════════════════════════════════════════════
     // 1c. BUSINESS CODE RESEND — client asked for their code on the website
+    // Template: business_id_request — {{1}} name, {{2}} business ID
+    // No header: a lone alphanumeric value in the header reads as an OTP to
+    // Meta's classifier and gets the template force-routed to Authentication,
+    // which needs a verified business. Keep this one header-free.
     // ════════════════════════════════════════════════════════════════════════
-    /** Reuses the approved welcome template, which already carries {{1}} name
-     *  and {{2}} code. Point this at a dedicated template once one is
-     *  approved in Meta — the wording reads oddly for a long-standing client
-     *  asking for their code back. */
-    private static final String CODE_RESEND_TEMPLATE = 'welcome_new_client';
+    private static final String CODE_RESEND_TEMPLATE = 'business_id_request';
 
     @future(callout=true)
     public static void sendBusinessCode(
