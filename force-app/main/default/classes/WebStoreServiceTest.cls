@@ -107,9 +107,24 @@ private class WebStoreServiceTest {
     @isTest
     static void testExistingCustomerAutoConfirms() {
         seedData();
-        insert new Account(
+        Account a = new Account(
             Name  = 'Existing Client',
             Phone = '+91 91234 56789'
+        );
+        insert a;
+        // Auto-confirm needs a vetted history: one delivered order.
+        Sale__c prior = new Sale__c(
+            Client__c       = a.Id,
+            Sale_Date__c    = Date.today().addDays(-5),
+            Order_Status__c = 'Delivered'
+        );
+        insert prior;
+        insert new Sale_Line_Item__c(
+            Sale__c        = prior.Id,
+            Brand__c       = 'Holiday_250g',
+            Packet_Type__c = '250g',
+            Quantity__c    = 0.5,
+            Rate_Per_Kg__c = 1200
         );
 
         Test.startTest();
@@ -189,6 +204,121 @@ private class WebStoreServiceTest {
             (List<Map<String, Object>>) orders[0].get('items');
         System.assertEquals(1, items.size());
         System.assertEquals('Holiday_250g', items[0].get('brand'));
+    }
+
+    @isTest
+    static void testOverduePaymentBlocksOrder() {
+        seedData();
+        Account a = new Account(
+            Name  = 'Slow Payer',
+            Phone = '+91 91234 56789'
+        );
+        insert a;
+        // Delivered 60 days ago, nothing collected → ₹600 owed.
+        Sale__c old = new Sale__c(
+            Client__c       = a.Id,
+            Sale_Date__c    = Date.today().addDays(-60),
+            Order_Status__c = 'Delivered'
+        );
+        insert old;
+        insert new Sale_Line_Item__c(
+            Sale__c        = old.Id,
+            Brand__c       = 'Holiday_250g',
+            Packet_Type__c = '250g',
+            Quantity__c    = 0.5,
+            Rate_Per_Kg__c = 1200
+        );
+
+        List<WebStoreService.OverdueSale> due =
+            WebStoreService.overdueSales(a.Id);
+        System.assertEquals(1, due.size());
+        System.assertEquals(600, due[0].balanceDue);
+        System.assertEquals(60, due[0].daysOld);
+        System.assertEquals(600, WebStoreService.sumDue(due));
+
+        Test.startTest();
+        Boolean blocked = false;
+        try {
+            WebStoreService.placeOrder(
+                orderInput('9123456789', 'web-ref-due', 1));
+        } catch (WebStoreService.PaymentDueException e) {
+            blocked = true;
+            System.assertEquals(600, e.totalDue);
+            System.assertEquals(1, e.overdue.size());
+            System.assert(e.getMessage().contains('45 days'));
+        }
+        System.assert(blocked, 'Order should have been refused');
+        System.assertEquals(0,
+            [SELECT COUNT() FROM Sale__c WHERE Web_Order_Ref__c = 'web-ref-due']);
+
+        // REST surface: 402 with the structured payload.
+        RestContext.request  = new RestRequest();
+        RestContext.response = new RestResponse();
+        RestContext.request.requestURI = '/services/apexrest/store/v1/orders';
+        RestContext.request.httpMethod = 'POST';
+        RestContext.request.requestBody = Blob.valueOf(JSON.serialize(
+            orderInput('9123456789', 'web-ref-due-rest', 1)));
+        WebStoreAPI.doPost();
+        System.assertEquals(402, RestContext.response.statusCode);
+        System.assert(RestContext.response.responseBody.toString()
+            .contains('PAYMENT_OVERDUE'));
+
+        // Settling the old order lifts the block.
+        insert new Client_Payment__c(
+            Sale__c            = old.Id,
+            Amount__c          = 600,
+            Payment_Date__c    = Date.today(),
+            Mode_of_Payment__c = 'UPI',
+            Accepted_By__c     = 'Vikram'
+        );
+        Test.stopTest();
+
+        System.assert(WebStoreService.overdueSales(a.Id).isEmpty(),
+            'Paid order must no longer block');
+    }
+
+    @isTest
+    static void testRecentUnpaidOrderDoesNotBlock() {
+        seedData();
+        Account a = new Account(
+            Name  = 'Fresh Client',
+            Phone = '+91 91234 56789'
+        );
+        insert a;
+        Sale__c recent = new Sale__c(
+            Client__c       = a.Id,
+            Sale_Date__c    = Date.today().addDays(-10),
+            Order_Status__c = 'Delivered'
+        );
+        insert recent;
+        insert new Sale_Line_Item__c(
+            Sale__c        = recent.Id,
+            Brand__c       = 'Holiday_250g',
+            Packet_Type__c = '250g',
+            Quantity__c    = 0.5,
+            Rate_Per_Kg__c = 1200
+        );
+        System.assert(WebStoreService.overdueSales(a.Id).isEmpty());
+
+        Test.startTest();
+        WebStoreService.OrderResult res = WebStoreService.placeOrder(
+            orderInput('9123456789', 'web-ref-recent', 1));
+        Test.stopTest();
+        System.assertEquals('Confirmed', res.status);
+
+        // payment-due endpoint answers empty for this code
+        Account saved = [SELECT Unique_Business_Code__c FROM Account
+                         WHERE Id = :a.Id];
+        RestContext.request  = new RestRequest();
+        RestContext.response = new RestResponse();
+        RestContext.request.requestURI =
+            '/services/apexrest/store/v1/payment-due';
+        RestContext.request.httpMethod = 'GET';
+        RestContext.request.params.put('code', saved.Unique_Business_Code__c);
+        WebStoreAPI.doGet();
+        System.assertEquals(200, RestContext.response.statusCode);
+        System.assert(RestContext.response.responseBody.toString()
+            .contains('"totalDue":0'));
     }
 
     @isTest

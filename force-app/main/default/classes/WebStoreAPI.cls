@@ -5,6 +5,7 @@
  *
  *   GET  /services/apexrest/store/v1/catalog          → product catalog + availability
  *   GET  /services/apexrest/store/v1/orders?phone=... → order history for a phone
+ *   GET  /services/apexrest/store/v1/payment-due?code=… → old unpaid orders blocking checkout
  *   POST /services/apexrest/store/v1/orders           → place an order
  */
 @RestResource(urlMapping='/store/v1/*')
@@ -44,6 +45,15 @@ global with sharing class WebStoreAPI {
                          .removeStart(', ').removeEnd(', '));
                 }
                 respond(res, 200, out);
+            } else if (path.contains('/payment-due')) {
+                // What a logged-in client must pay before ordering again.
+                List<WebStoreService.OverdueSale> due =
+                    WebStoreService.overdueSalesByCode(req.params.get('code'));
+                respond(res, 200, new Map<String, Object>{
+                    'overdue'   => due,
+                    'totalDue'  => WebStoreService.sumDue(due),
+                    'daysLimit' => WebStoreService.OVERDUE_DAYS
+                });
             } else if (path.contains('/orders')) {
                 // Orders are addressable by code or by phone; the code is
                 // what the website holds after login.
@@ -150,6 +160,15 @@ global with sharing class WebStoreAPI {
                 WebStoreService.placeOrder(input);
             respond(res, result.duplicate ? 200 : 201,
                     new Map<String, Object>{ 'order' => result });
+        } catch (WebStoreService.PaymentDueException e) {
+            // 402 so the website can tell "pay first" apart from any other
+            // rejection and show the payment panel instead of an error line.
+            Map<String, Object> body = error(e.getMessage());
+            body.put('code',     'PAYMENT_OVERDUE');
+            body.put('overdue',  e.overdue);
+            body.put('totalDue', e.totalDue);
+            body.put('daysLimit', WebStoreService.OVERDUE_DAYS);
+            respond(res, 402, body);
         } catch (WebStoreService.WebStoreException e) {
             respond(res, 400, error(e.getMessage()));
         } catch (Exception e) {

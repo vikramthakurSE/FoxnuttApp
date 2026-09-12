@@ -17,6 +17,30 @@ public without sharing class WebStoreService {
 
     public class WebStoreException extends Exception {}
 
+    // Days after the sale date before an unpaid delivered order stops the
+    // client from placing new ones on the website.
+    public static final Integer OVERDUE_DAYS = 45;
+
+    /** One unpaid order that is past the OVERDUE_DAYS limit. */
+    public class OverdueSale {
+        public String  saleId;
+        public String  saleName;
+        public String  saleDate;
+        public Decimal total;
+        public Decimal balanceDue;
+        public Integer daysOld;
+    }
+
+    /**
+     * Thrown by placeOrder when the client owes on an old order. Carries
+     * the orders so the website can show exactly what to pay, not just a
+     * sentence.
+     */
+    public class PaymentDueException extends Exception {
+        public List<OverdueSale> overdue;
+        public Decimal totalDue;
+    }
+
     // ── Inputs / outputs ──────────────────────────────────────────────────
     public class OrderItemInput {
         public String  slug;
@@ -618,6 +642,13 @@ public without sharing class WebStoreService {
         Account client = coded != null ? coded : findClientByPhone(digits);
         Boolean isNew  = (client == null);
 
+        // A client with an old unpaid delivery pays that first. Checked
+        // before any DML so nothing is written for a rejected order.
+        if (!isNew) {
+            List<OverdueSale> due = overdueSales(client.Id);
+            if (!due.isEmpty()) throw paymentDue(due);
+        }
+
         Savepoint sp = Database.setSavepoint();
         try {
             if (isNew) {
@@ -754,6 +785,61 @@ public without sharing class WebStoreService {
             });
         }
         return out;
+    }
+
+    // ── Overdue payments ─────────────────────────────────────────────────
+    /**
+     * Delivered orders with money still owed that are older than
+     * OVERDUE_DAYS. Only delivered sales count: an order that has not been
+     * delivered has nothing to pay for yet, and a cancelled one never will.
+     */
+    public static List<OverdueSale> overdueSales(Id clientId) {
+        List<OverdueSale> out = new List<OverdueSale>();
+        if (clientId == null) return out;
+        Date cutoff = Date.today().addDays(-OVERDUE_DAYS);
+        for (Sale__c s : [
+            SELECT Id, Name, Sale_Date__c, Total_Revenue__c, Balance_Due__c
+            FROM Sale__c
+            WHERE Client__c = :clientId
+            AND Order_Status__c = 'Delivered'
+            AND Balance_Due__c > 0
+            AND Sale_Date__c <= :cutoff
+            ORDER BY Sale_Date__c ASC
+        ]) {
+            OverdueSale o = new OverdueSale();
+            o.saleId     = s.Id;
+            o.saleName   = s.Name;
+            o.saleDate   = String.valueOf(s.Sale_Date__c);
+            o.total      = s.Total_Revenue__c;
+            o.balanceDue = s.Balance_Due__c;
+            o.daysOld    = s.Sale_Date__c.daysBetween(Date.today());
+            out.add(o);
+        }
+        return out;
+    }
+
+    /** Overdue orders for a website login code; empty when none or unknown. */
+    public static List<OverdueSale> overdueSalesByCode(String code) {
+        Account a = findClientByCode(code);
+        return a == null ? new List<OverdueSale>() : overdueSales(a.Id);
+    }
+
+    public static Decimal sumDue(List<OverdueSale> due) {
+        Decimal total = 0;
+        for (OverdueSale o : due) {
+            if (o.balanceDue != null) total += o.balanceDue;
+        }
+        return total.setScale(2);
+    }
+
+    private static PaymentDueException paymentDue(List<OverdueSale> due) {
+        PaymentDueException e = new PaymentDueException();
+        e.overdue  = due;
+        e.totalDue = sumDue(due);
+        e.setMessage('You have a payment pending for more than ' +
+            OVERDUE_DAYS + ' days. Please clear it first; then you will be ' +
+            'able to place the order.');
+        return e;
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────
