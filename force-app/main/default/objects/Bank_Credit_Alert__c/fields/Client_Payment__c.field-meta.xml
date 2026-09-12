@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Client_Payment__c</fullName>
+    <label>Client Payment</label>
+    <required>false</required>
+    <trackTrending>false</trackTrending>
+    <type>Lookup</type>
+    <deleteConstraint>SetNull</deleteConstraint>
+    <referenceTo>Client_Payment__c</referenceTo>
+    <relationshipLabel>Bank Credit Alerts</relationshipLabel>
+    <relationshipName>Bank_Credit_Alerts</relationshipName>
+</CustomField>

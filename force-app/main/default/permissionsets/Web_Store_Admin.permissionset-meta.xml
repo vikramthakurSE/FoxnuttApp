@@ -3,6 +3,10 @@
     <label>Web Store Admin</label>
     <hasActivationRequired>false</hasActivationRequired>
     <classAccesses>
+        <apexClass>AxisCreditAlertHandler</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
         <apexClass>PendingWebOrdersController</apexClass>
         <enabled>true</enabled>
     </classAccesses>
@@ -15,6 +19,15 @@
         <enabled>true</enabled>
     </classAccesses>
     <objectPermissions>
+        <object>Bank_Credit_Alert__c</object>
+        <allowCreate>true</allowCreate>
+        <allowDelete>true</allowDelete>
+        <allowEdit>true</allowEdit>
+        <allowRead>true</allowRead>
+        <modifyAllRecords>true</modifyAllRecords>
+        <viewAllRecords>true</viewAllRecords>
+    </objectPermissions>
+    <objectPermissions>
         <object>Web_Product__c</object>
         <allowCreate>true</allowCreate>
         <allowDelete>true</allowDelete>
@@ -23,6 +36,71 @@
         <modifyAllRecords>true</modifyAllRecords>
         <viewAllRecords>true</viewAllRecords>
     </objectPermissions>
+    <fieldPermissions>
+        <field>Bank_Credit_Alert__c.Amount__c</field>
+        <editable>true</editable>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Bank_Credit_Alert__c.UTR__c</field>
+        <editable>true</editable>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Bank_Credit_Alert__c.Payer_Name__c</field>
+        <editable>true</editable>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Bank_Credit_Alert__c.Remark__c</field>
+        <editable>true</editable>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Bank_Credit_Alert__c.Transaction_Info__c</field>
+        <editable>true</editable>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Bank_Credit_Alert__c.Credited_At__c</field>
+        <editable>true</editable>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Bank_Credit_Alert__c.Match_Reason__c</field>
+        <editable>true</editable>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Bank_Credit_Alert__c.Subject__c</field>
+        <editable>true</editable>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Bank_Credit_Alert__c.Raw_Body__c</field>
+        <editable>true</editable>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Bank_Credit_Alert__c.Sale__c</field>
+        <editable>true</editable>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Bank_Credit_Alert__c.Client__c</field>
+        <editable>true</editable>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Bank_Credit_Alert__c.Client_Payment__c</field>
+        <editable>true</editable>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Bank_Credit_Alert__c.Status__c</field>
+        <editable>true</editable>
+        <readable>true</readable>
+    </fieldPermissions>
     <fieldPermissions>
         <field>Web_Product__c.Grade__c</field>
         <editable>true</editable>
@@ -98,6 +176,10 @@
         <editable>true</editable>
         <readable>true</readable>
     </fieldPermissions>
+    <tabSettings>
+        <tab>Bank_Credit_Alert__c</tab>
+        <visibility>Visible</visibility>
+    </tabSettings>
     <tabSettings>
         <tab>Web_Product__c</tab>
         <visibility>Visible</visibility>

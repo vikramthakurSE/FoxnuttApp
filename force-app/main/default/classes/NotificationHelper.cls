@@ -58,6 +58,19 @@ public class NotificationHelper {
         }
     }
 
+    // ── Bank credit that could not be tied to a client (AxisCreditAlertHandler)
+    public static void notifyUnmatchedCredit(Bank_Credit_Alert__c alert) {
+        Decimal amt = alert.Amount__c == null ? 0 : alert.Amount__c;
+        send(
+            TYPE_PAYMENT,
+            'Bank credit needs review: ₹' + amt.setScale(0).format(),
+            'From ' + (String.isBlank(alert.Payer_Name__c)
+                       ? 'unknown payer' : alert.Payer_Name__c) +
+            '. Could not match to a client — open to book it by hand.',
+            alert.Id
+        );
+    }
+
     // ════════════════════════════════════════════════════════════════════════
     // 1. NEW SALE CREATED — called from SaleLineItemHelper after line items saved
     // ════════════════════════════════════════════════════════════════════════
