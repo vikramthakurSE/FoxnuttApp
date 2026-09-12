@@ -317,6 +317,9 @@ public class WhatsAppHelper {
     // 6. PAYMENT RECEIVED
     // Template: payment_received
     // {{1}} name, {{2}} amount, {{3}} order#, {{4}} remaining balance
+    // This template has NO header in Meta. Sending a header parameter makes
+    // Meta reject the whole message (#132000), so the business code is
+    // left out here until the template gains a header.
     // ════════════════════════════════════════════════════════════════════════
     @future(callout=true)
     public static void sendPaymentReceived(
@@ -325,8 +328,8 @@ public class WhatsAppHelper {
     ) {
         String p = fmtPhone(phone);
         if (p == null) return;
-        sendMessage(buildPayloadWithTextHeader(
-            p, 'payment_received', hdr(businessCode),
+        sendMessage(buildPayload(
+            p, 'payment_received',
             new List<String>{ clientName, amount,
                               saleName, remainingBalance }));
     }
@@ -513,8 +516,8 @@ public class WhatsAppHelper {
                           ? p.Sale__r.Balance_Due__c : 0;
             if (bal < 0) bal = 0;   // a CD over-settlement shows as ₹0, not negative
 
-            sendMessage(buildPayloadWithTextHeader(ph, 'payment_received',
-                hdr(p.Sale__r.Client__r.Unique_Business_Code__c),
+            // No header: see sendPaymentReceived.
+            sendMessage(buildPayload(ph, 'payment_received',
                 new List<String>{
                     p.Sale__r.Client__r.Name,
                     amt.setScale(0).format(),

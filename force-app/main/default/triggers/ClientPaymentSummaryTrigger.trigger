@@ -16,19 +16,12 @@ trigger ClientPaymentSummaryTrigger on Client_Payment__c (
             new List<Client_Payment__c>(Trigger.new)
         );
 
-        // WhatsApp — query fresh Sale data with client phone
-        Set<Id> saleIds = new Set<Id>();
-        for (Client_Payment__c p : Trigger.new) {
-            if (p.Sale__c != null) saleIds.add(p.Sale__c);
-        }
-        if (!saleIds.isEmpty()) {
-            Map<Id, Sale__c> saleMap = new Map<Id, Sale__c>([
-                SELECT Id, Name, Balance_Due__c,
-                       Client__r.Name, Client__r.Phone,
-                       Client__r.Unique_Business_Code__c
-                FROM Sale__c WHERE Id IN :saleIds
-            ]);
-            WhatsAppHelper.dispatchPaymentReceived(Trigger.new, saleMap);
+        // WhatsApp — sent @future so Balance_Due__c is read after the
+        // Settlement_Amount roll-up commits and the remaining balance in
+        // the message is the post-payment figure, not the stale one.
+        if (!System.isFuture() && !System.isBatch()) {
+            WhatsAppHelper.dispatchPaymentReceivedAsync(
+                Trigger.newMap.keySet());
         }
     }
 }
