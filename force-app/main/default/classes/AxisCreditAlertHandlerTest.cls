@@ -101,6 +101,40 @@ private class AxisCreditAlertHandlerTest {
     }
 
     @isTest
+    static void testPayerNameIsLearnedAndReused() {
+        Account a = new Account(Name = 'Alpha Traders', Phone = '+91 98453 66666');
+        Account b = new Account(Name = 'Bravo Traders', Phone = '+91 98453 77777');
+        insert new List<Account>{ a, b };
+        deliveredSale(a, 0.3, 50);   // ₹300
+        deliveredSale(b, 0.5, 51);   // ₹500
+
+        Test.startTest();
+        // First payment: unique amount → matched, payer name remembered.
+        AxisCreditAlertHandler.process(
+            'INR 300.00 was credited to your A/c.',
+            body('300.00', '500000000001', 'RAMESH K', 'Paym'));
+        System.assertEquals('RAMESH K',
+            [SELECT UPI_Payer_Name__c FROM Account WHERE Id = :a.Id].UPI_Payer_Name__c);
+        System.assertEquals(null,
+            [SELECT UPI_Payer_Name__c FROM Account WHERE Id = :b.Id].UPI_Payer_Name__c);
+
+        // Both clients now owe ₹500 (a gets a second order), so amount is
+        // ambiguous and the name is not in either account name — only the
+        // learned payer name can tell them apart.
+        deliveredSale(a, 0.5, 30);
+        Bank_Credit_Alert__c second = AxisCreditAlertHandler.process(
+            'INR 500.00 was credited to your A/c.',
+            body('500.00', '500000000002', 'RAMESH K', 'Paym'));
+        Test.stopTest();
+
+        System.assertEquals('Matched', second.Status__c);
+        System.assertEquals(a.Id, second.Client__c);
+        System.assert(second.Match_Reason__c.contains('Known UPI payer'));
+        System.assertEquals(500,
+            [SELECT Balance_Due__c FROM Sale__c WHERE Client__c = :b.Id].Balance_Due__c);
+    }
+
+    @isTest
     static void testUnmatchedNeedsReviewWithTask() {
         Account a = new Account(Name = 'Alpha Traders', Phone = '+91 98453 44444');
         insert a;

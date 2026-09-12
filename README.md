@@ -13,9 +13,12 @@ ambiguous stays **Needs Review** (list view on the Bank Credit Alerts tab)
 and sends a push notification.
 
 Matching, in order: order number in the UPI remark (`SAL-0059`), business
-code in the remark, an amount that equals exactly one client's open
+code in the remark, a UPI payer name already learned on exactly one client
+(`Account.UPI_Payer_Name__c`, filled in automatically after a client's
+first matched payment), an amount that equals exactly one client's open
 balance, then payer name against the account or contact person (only if it
-points at a single client). A payment larger than the oldest balance is
+points at a single client). Customers do not need to type anything in the
+remark; Axis truncates it anyway. A payment larger than the oldest balance is
 split across that client's open orders, oldest first. Duplicate UTRs are
 ignored.
 

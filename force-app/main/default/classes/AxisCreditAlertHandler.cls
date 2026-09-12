@@ -102,6 +102,7 @@ global with sharing class AxisCreditAlertHandler
 
         List<Client_Payment__c> payments = allocate(m, p);
         insert payments;   // trigger: WhatsApp + email + balances
+        rememberPayer(m.clientId, p.payer);
 
         alert.Status__c         = 'Matched';
         alert.Client__c         = m.clientId;
@@ -186,6 +187,7 @@ global with sharing class AxisCreditAlertHandler
         return [
             SELECT Id, Name, Client__c, Client__r.Name,
                    Client__r.Contact_Person__c,
+                   Client__r.UPI_Payer_Name__c,
                    Client__r.Unique_Business_Code__c,
                    Balance_Due__c, Sale_Date__c, Order_Status__c
             FROM Sale__c
@@ -228,7 +230,28 @@ global with sharing class AxisCreditAlertHandler
             }
         }
 
-        // 3. Exact amount owed by exactly one client.
+        // 3. A payer name we have seen before on exactly one client. This
+        //    is what makes repeat customers match with no remark at all,
+        //    even when two clients happen to owe the same amount.
+        String payerKey = letters(p.payer);
+        if (payerKey.length() >= 3) {
+            Set<Id> known = new Set<Id>();
+            String label;
+            for (Sale__c s : unpaid) {
+                if (letters(s.Client__r.UPI_Payer_Name__c) == payerKey) {
+                    known.add(s.Client__c);
+                    label = s.Client__r.Name;
+                }
+            }
+            if (known.size() == 1) {
+                Match m = new Match();
+                m.clientId = new List<Id>(known)[0];
+                m.reason   = 'Known UPI payer "' + p.payer + '" for ' + label + '.';
+                return m;
+            }
+        }
+
+        // 4. Exact amount owed by exactly one client.
         Set<Id> byAmount = new Set<Id>();
         Id amountSale;
         for (Sale__c s : unpaid) {
@@ -245,7 +268,7 @@ global with sharing class AxisCreditAlertHandler
             return m;
         }
 
-        // 4. Payer name against the account or contact person, one client.
+        // 5. Payer name against the account or contact person, one client.
         String payer = letters(p.payer);
         if (payer.length() >= 4) {
             Set<Id> byName = new Set<Id>();
@@ -265,6 +288,22 @@ global with sharing class AxisCreditAlertHandler
             }
         }
         return null;
+    }
+
+    /**
+     * Store the bank's payer name on the client after a confident match,
+     * so the next payment from the same UPI handle matches by name. Only
+     * fills a blank: a name set by hand is never overwritten.
+     */
+    private static void rememberPayer(Id clientId, String payer) {
+        if (clientId == null || String.isBlank(payer)) return;
+        List<Account> rows = [
+            SELECT Id, UPI_Payer_Name__c FROM Account WHERE Id = :clientId
+        ];
+        if (rows.isEmpty() || String.isNotBlank(rows[0].UPI_Payer_Name__c)) return;
+        rows[0].UPI_Payer_Name__c = left(payer.trim(), 120);
+        try { update rows[0]; }
+        catch (Exception e) { System.debug('UPI payer not saved: ' + e.getMessage()); }
     }
 
     private static String letters(String s) {
