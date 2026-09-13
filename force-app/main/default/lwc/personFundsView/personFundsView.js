@@ -194,7 +194,8 @@ export default class PersonFundsView extends LightningElement {
                                 : 'txn-icon adj-sub-icon',
                     title:      (isAdd ? 'Balance Added' : 'Balance Deducted'),
                     meta:       this.fmtDate(a.date) +
-                                (a.reason ? ' · ' + a.reason : ''),
+                                (a.reason ? ' · ' + a.reason : '') +
+                                (a.notes  ? ' · ' + a.notes  : ''),
                     amtDisplay: (isAdd ? '+' : '-') + '₹' + this.fmt(a.amount),
                     amtClass:   isAdd ? 'txn-amt positive' : 'txn-amt negative',
                     date:       a.date
@@ -428,7 +429,8 @@ export default class PersonFundsView extends LightningElement {
                                          : 'txn-icon adj-sub-icon',
                         title:      isAdd ? 'Balance Added' : 'Balance Deducted',
                         meta:       this.fmtDate(a.date) +
-                                    (a.reason ? ' · ' + a.reason : ''),
+                                    (a.reason ? ' · ' + a.reason : '') +
+                                    (a.notes  ? ' · ' + a.notes  : ''),
                         amtDisplay: (isAdd ? '+' : '-') + '₹' + this.fmt(a.amount),
                         amtClass:   isAdd ? 'txn-amt positive' : 'txn-amt negative',
                         date:       a.date

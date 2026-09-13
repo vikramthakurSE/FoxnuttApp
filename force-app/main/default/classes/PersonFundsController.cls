@@ -92,8 +92,13 @@ public with sharing class PersonFundsController {
             Decimal actual   = actualCollected.containsKey(pf.Name)
                                ? actualCollected.get(pf.Name) : 0;
 
-            // Parse Adjustment_Log__c to extract logged adjustments
-            Decimal totalAdjusted = 0;
+            // Parse Adjustment_Log__c to extract logged adjustments.
+            // collectedDelta is the *signed* net these entries applied to
+            // Total_Collected__c — additions raise it, subtractions lower it.
+            // Entries tagged target=withdrawn went to Total_Withdrawn__c
+            // instead, so they must not count here. Untagged (legacy)
+            // entries all pre-date that split and did hit Total_Collected__c.
+            Decimal collectedDelta = 0;
             if (String.isNotBlank(pf.Adjustment_Log__c)) {
                 try {
                     List<Object> logEntries =
@@ -108,8 +113,14 @@ public with sharing class PersonFundsController {
                         String  type = (String) e.get('type');
                         String  dateStr = (String) e.get('date');
                         String  rsn  = (String) e.get('reason');
-                        if (type == 'Addition') totalAdjusted += amt;
-                        else totalAdjusted -= amt;
+                        String  nts  = (String) e.get('notes');
+                        String  tgt  = e.get('target') != null
+                                       ? (String) e.get('target') : 'collected';
+
+                        if (tgt == 'collected') {
+                            if (type == 'Addition') collectedDelta += amt;
+                            else collectedDelta -= amt;
+                        }
 
                         adjustmentEntries.add(new Map<String, Object>{
                             'person' => pf.Name,
@@ -117,7 +128,8 @@ public with sharing class PersonFundsController {
                             'type'   => type,
                             'date'   => dateStr != null
                                         ? dateStr.left(10) : '',
-                            'reason' => rsn
+                            'reason' => rsn,
+                            'notes'  => nts
                         });
                     }
                 } catch (Exception ex) {
@@ -125,8 +137,11 @@ public with sharing class PersonFundsController {
                 }
             }
 
-            // Opening balance = recorded - actual payments - logged adjustments
-            Decimal opening = recorded - actual - Math.abs(totalAdjusted);
+            // Opening balance = whatever Total_Collected__c holds that the
+            // payment records and the adjustment log don't account for.
+            // Subtracting the signed delta backs the adjustments out; the
+            // old Math.abs() here double-subtracted every deduction.
+            Decimal opening = recorded - actual - collectedDelta;
 
             if (opening > 0) {
                 openingBalances.add(new Map<String, Object>{
@@ -200,60 +215,135 @@ public with sharing class PersonFundsController {
         String personName,
         Decimal amount,
         String adjustmentType,
-        String reason
+        String reason,
+        String notes
     ) {
         if (amount == null || amount <= 0) {
             throw new AuraHandledException('Amount must be greater than 0.');
         }
 
-        List<Person_Fund__c> funds = [
-            SELECT Id, Name, Total_Collected__c,
+        // A transfer moves cash between two people, so it has to write BOTH
+        // records. Deducting the sender without crediting the recipient
+        // destroys the money outright.
+        String recipient = null;
+        if (reason == 'Transferred to Vikram')     recipient = 'Vikram';
+        else if (reason == 'Transferred to Rohan') recipient = 'Rohan';
+
+        if (recipient == personName) {
+            throw new AuraHandledException('Cannot transfer to yourself.');
+        }
+
+        // Profit withdrawals leave the business: they belong in
+        // Total_Withdrawn__c, not netted out of what was collected.
+        Boolean isWithdrawal = (reason == 'Profit Withdrawal');
+
+        // Only 'Balance Adjustment' honours the caller's type; transfers and
+        // withdrawals always leave the source balance.
+        String srcType = (recipient != null || isWithdrawal)
+                         ? 'Subtraction' : adjustmentType;
+
+        Set<String> names = new Set<String>{ personName };
+        if (recipient != null) names.add(recipient);
+
+        Map<String, Person_Fund__c> byName =
+            new Map<String, Person_Fund__c>();
+        for (Person_Fund__c pf : [
+            SELECT Id, Name, Total_Collected__c, Total_Withdrawn__c,
                    Last_Updated__c, Adjustment_Log__c
             FROM Person_Fund__c
-            WHERE Name = :personName
-            LIMIT 1
-        ];
+            WHERE Name IN :names
+            FOR UPDATE
+        ]) {
+            byName.put(pf.Name, pf);
+        }
 
-        if (funds.isEmpty()) {
+        if (!byName.containsKey(personName)) {
             throw new AuraHandledException(
                 'Person Fund record not found for: ' + personName
             );
         }
+        if (recipient != null && !byName.containsKey(recipient)) {
+            throw new AuraHandledException(
+                'Person Fund record not found for: ' + recipient
+            );
+        }
 
-        Person_Fund__c pf = funds[0];
+        Date today = Date.today();
+        List<Person_Fund__c> toUpdate = new List<Person_Fund__c>();
 
-        // Step 1: Write the log entry FIRST in its own DML
-        // This ensures it persists even if a trigger fires
-        // on the balance update below
-        String today    = String.valueOf(Date.today()).left(10);
-        String newEntry = '{"date":"' + today +
-                          '","amount":' + amount.setScale(2) +
-                          ',"type":"' + adjustmentType +
-                          '","reason":"' + reason.replaceAll('"', '\'') +
-                          '"}';
-
-        String existing = pf.Adjustment_Log__c;
-        String newLog   = String.isBlank(existing)
-                          ? '[' + newEntry + ']'
-                          : existing.removeEnd(']') + ',' + newEntry + ']';
-
-        update new Person_Fund__c(
-            Id                 = pf.Id,
-            Adjustment_Log__c  = newLog
+        // ── Source side ────────────────────────────────────────────────
+        Person_Fund__c src = byName.get(personName);
+        Person_Fund__c srcUpd = new Person_Fund__c(
+            Id              = src.Id,
+            Last_Updated__c = today
         );
 
-        // Step 2: Update balance separately
-        Decimal current = pf.Total_Collected__c != null
-                          ? pf.Total_Collected__c : 0;
-        Decimal updated = adjustmentType == 'Addition'
-                          ? current + amount
-                          : current - amount;
+        if (isWithdrawal) {
+            srcUpd.Total_Withdrawn__c =
+                (src.Total_Withdrawn__c != null
+                 ? src.Total_Withdrawn__c : 0) + amount;
+            srcUpd.Adjustment_Log__c = appendLogEntry(
+                src.Adjustment_Log__c, today, amount,
+                srcType, reason, notes, 'withdrawn'
+            );
+        } else {
+            Decimal cur = src.Total_Collected__c != null
+                          ? src.Total_Collected__c : 0;
+            srcUpd.Total_Collected__c = srcType == 'Addition'
+                                        ? cur + amount : cur - amount;
+            srcUpd.Adjustment_Log__c = appendLogEntry(
+                src.Adjustment_Log__c, today, amount,
+                srcType, reason, notes, 'collected'
+            );
+        }
+        toUpdate.add(srcUpd);
 
-        update new Person_Fund__c(
-            Id                 = pf.Id,
-            Total_Collected__c = updated,
-            Last_Updated__c    = Date.today()
-        );
+        // ── Recipient side — the half that used to be missing ──────────
+        if (recipient != null) {
+            Person_Fund__c dst = byName.get(recipient);
+            Decimal dstCur = dst.Total_Collected__c != null
+                             ? dst.Total_Collected__c : 0;
+            toUpdate.add(new Person_Fund__c(
+                Id                 = dst.Id,
+                Total_Collected__c = dstCur + amount,
+                Last_Updated__c    = today,
+                Adjustment_Log__c  = appendLogEntry(
+                    dst.Adjustment_Log__c, today, amount, 'Addition',
+                    'Transfer received from ' + personName,
+                    notes, 'collected'
+                )
+            ));
+        }
+
+        // Single DML: a transfer can never land half-applied.
+        update toUpdate;
+    }
+
+    // Appends one entry to a person's JSON adjustment log. Built through
+    // JSON.serialize so quotes and newlines in free text can't corrupt it —
+    // the old string concatenation only stripped double quotes.
+    private static String appendLogEntry(
+        String existing,
+        Date   entryDate,
+        Decimal amount,
+        String type,
+        String reason,
+        String notes,
+        String target
+    ) {
+        Map<String, Object> entry = new Map<String, Object>{
+            'date'   => String.valueOf(entryDate).left(10),
+            'amount' => amount.setScale(2),
+            'type'   => type,
+            'reason' => reason,
+            'target' => target
+        };
+        if (String.isNotBlank(notes)) entry.put('notes', notes);
+
+        String newEntry = JSON.serialize(entry);
+        return String.isBlank(existing)
+               ? '[' + newEntry + ']'
+               : existing.removeEnd(']') + ',' + newEntry + ']';
     }
 
     // ── Get available quarters ────────────────────────────────────────────

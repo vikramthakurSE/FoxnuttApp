@@ -404,7 +404,6 @@ public class EmailNotificationHelper {
             FROM Sale__c
             WHERE Payment_Status__c != 'Fully Paid'
             AND Order_Status__c = 'Delivered'
-            AND Order_Status__c != 'Cancelled'
             AND Balance_Due__c > 0
             ORDER BY Balance_Due__c DESC
             LIMIT 50

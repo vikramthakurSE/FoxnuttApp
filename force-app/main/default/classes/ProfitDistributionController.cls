@@ -40,11 +40,14 @@ public class ProfitDistributionController {
     @AuraEnabled(cacheable=false)
     public static Map<String, Object> getQuarterlyProfit(String quarter) {
         // Revenue + Profit from delivered sales
+        // Effective_* nets off the cash discount given to the client
+        // (Total_CD_Amount__c). Splitting Total_Profit__c handed out money
+        // the business never kept.
         Decimal revenue = 0;
         Decimal profit  = 0;
         for (AggregateResult ar : [
-            SELECT SUM(Total_Revenue__c) rev,
-                   SUM(Total_Profit__c) pft
+            SELECT SUM(Effective_Revenue__c) rev,
+                   SUM(Effective_Profit__c) pft
             FROM Sale__c
             WHERE Quarter__c = :quarter
             AND Order_Status__c = 'Delivered'

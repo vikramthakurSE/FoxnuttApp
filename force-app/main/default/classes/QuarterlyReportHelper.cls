@@ -84,6 +84,10 @@ public class QuarterlyReportHelper {
     // ════════════════════════════════════════════════════════════════════════
     // METRICS GATHERING
     // ════════════════════════════════════════════════════════════════════════
+    // Every metric below counts Delivered sales only. An order that is
+    // cancelled or still in flight has earned nothing yet — it is also the
+    // point where stock is deducted and client balances are counted — so
+    // including it overstated revenue, profit and volume.
     private static Map<String, Object> gatherMetrics(
         Date startDate, Date endDate, String quarter
     ) {
@@ -91,14 +95,14 @@ public class QuarterlyReportHelper {
 
         // ── 1. Revenue & Sales ─────────────────────────────────────────────
         AggregateResult revAR = [
-            SELECT SUM(Total_Revenue__c) revenue,
-                   SUM(Total_Profit__c)  profit,
+            SELECT SUM(Effective_Revenue__c) revenue,
+                   SUM(Effective_Profit__c)  profit,
                    SUM(Total_Collected__c) collected,
                    COUNT(Id) saleCount
             FROM Sale__c
             WHERE Sale_Date__c >= :startDate
             AND   Sale_Date__c <= :endDate
-            AND   Order_Status__c != 'Cancelled'
+            AND   Order_Status__c = 'Delivered'
         ];
         Decimal revenue   = (Decimal) revAR.get('revenue');
         Decimal profit    = (Decimal) revAR.get('profit');
@@ -123,7 +127,7 @@ public class QuarterlyReportHelper {
             FROM Sale_Line_Item__c
             WHERE Sale__r.Sale_Date__c >= :startDate
             AND   Sale__r.Sale_Date__c <= :endDate
-            AND   Sale__r.Order_Status__c != 'Cancelled'
+            AND   Sale__r.Order_Status__c = 'Delivered'
         ];
         Decimal kgSold = (Decimal) kgAR.get('totalKg');
         kgSold = kgSold != null ? kgSold : 0;
@@ -137,7 +141,7 @@ public class QuarterlyReportHelper {
             FROM Sale__c
             WHERE Sale_Date__c >= :startDate
             AND   Sale_Date__c <= :endDate
-            AND   Order_Status__c != 'Cancelled'
+            AND   Order_Status__c = 'Delivered'
         ];
         m.put('activeClients',
             Integer.valueOf(clientAR.get('activeClients')));
@@ -146,7 +150,7 @@ public class QuarterlyReportHelper {
         AggregateResult outAR = [
             SELECT SUM(Balance_Due__c) total
             FROM Sale__c
-            WHERE Order_Status__c != 'Cancelled'
+            WHERE Order_Status__c = 'Delivered'
             AND   Balance_Due__c > 0
         ];
         Decimal totalOutstanding = (Decimal) outAR.get('total');
@@ -161,7 +165,7 @@ public class QuarterlyReportHelper {
             FROM Sale__c
             WHERE Sale_Date__c >= :startDate
             AND   Sale_Date__c <= :endDate
-            AND   Order_Status__c != 'Cancelled'
+            AND   Order_Status__c = 'Delivered'
             AND   Balance_Due__c > 0
         ];
         Decimal qOutstanding = (Decimal) qOutAR.get('total');
@@ -171,15 +175,15 @@ public class QuarterlyReportHelper {
         // Top 3 clients by revenue this quarter
         List<AggregateResult> topClients = [
             SELECT Client__r.Name clientName,
-                   SUM(Total_Revenue__c) rev,
-                   SUM(Total_Profit__c) pft,
+                   SUM(Effective_Revenue__c) rev,
+                   SUM(Effective_Profit__c) pft,
                    COUNT(Id) cnt
             FROM Sale__c
             WHERE Sale_Date__c >= :startDate
             AND   Sale_Date__c <= :endDate
-            AND   Order_Status__c != 'Cancelled'
+            AND   Order_Status__c = 'Delivered'
             GROUP BY Client__r.Name
-            ORDER BY SUM(Total_Revenue__c) DESC
+            ORDER BY SUM(Effective_Revenue__c) DESC
             LIMIT 3
         ];
         m.put('topClients', topClients);
@@ -192,7 +196,7 @@ public class QuarterlyReportHelper {
             FROM Sale_Line_Item__c
             WHERE Sale__r.Sale_Date__c >= :startDate
             AND   Sale__r.Sale_Date__c <= :endDate
-            AND   Sale__r.Order_Status__c != 'Cancelled'
+            AND   Sale__r.Order_Status__c = 'Delivered'
             GROUP BY Brand__c
             ORDER BY SUM(Quantity__c) DESC
             LIMIT 7
@@ -202,15 +206,15 @@ public class QuarterlyReportHelper {
         // ── 5. Team performance ────────────────────────────────────────────
         List<AggregateResult> teamPerf = [
             SELECT Regional_Manager__c manager,
-                   SUM(Total_Revenue__c) rev,
+                   SUM(Effective_Revenue__c) rev,
                    COUNT(Id) cnt
             FROM Sale__c
             WHERE Sale_Date__c >= :startDate
             AND   Sale_Date__c <= :endDate
-            AND   Order_Status__c != 'Cancelled'
+            AND   Order_Status__c = 'Delivered'
             AND   Regional_Manager__c != null
             GROUP BY Regional_Manager__c
-            ORDER BY SUM(Total_Revenue__c) DESC
+            ORDER BY SUM(Effective_Revenue__c) DESC
         ];
         m.put('teamPerf', teamPerf);
 

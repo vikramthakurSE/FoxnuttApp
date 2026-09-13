@@ -94,7 +94,7 @@
                 </button>
                 <button class={salesTabClass}
                     onclick={showSalesTab}>
-                    Sales
+                    Sales (Delivered)
                 </button>
             </div>
 
@@ -163,7 +163,9 @@
                 <template if:true={showingSales}>
                     <template if:true={noSales}>
                         <div class="empty-wrap">
-                            <div class="empty-title">No sales yet</div>
+                            <div class="empty-title">
+                                No delivered sales yet
+                            </div>
                         </div>
                     </template>
                     <template for:each={detailSales} for:item="s">
@@ -224,6 +226,16 @@
         <div class="inv-subtitle">Live stock levels</div>
     </div>
 
+    <!-- QUARTER SELECTOR -->
+    <div class="qtr-strip">
+        <template for:each={quarterChips} for:item="q">
+            <button key={q.key} class={q.cls}
+                data-key={q.key} onclick={selectQuarter}>
+                {q.label}
+            </button>
+        </template>
+    </div>
+
     <!-- LOADING -->
     <template if:true={isLoading}>
         <div class="loading-wrap" style="padding:60px 20px;">
@@ -233,6 +245,43 @@
     </template>
 
     <template if:false={isLoading}>
+
+        <!-- QUARTER PERFORMANCE -->
+        <template if:true={isQuarterView}>
+            <div class="qtr-panel">
+                <div class="qtr-panel-head">
+                    <div class="qtr-panel-title">{quarterLabel} Sales</div>
+                    <div class="qtr-panel-range">{quarterRangeLabel}</div>
+                </div>
+                <div class="qtr-panel-note">
+                    Delivered orders only
+                </div>
+                <div class="qtr-metrics">
+                    <div class="qm-item">
+                        <div class="qm-label">Total Sales</div>
+                        <div class="qm-val">{quarterOrders}</div>
+                        <div class="qm-sub">{quarterKg} KG</div>
+                    </div>
+                    <div class="qm-item">
+                        <div class="qm-label">Revenue</div>
+                        <div class="qm-val green">&#8377;{quarterRevenue}</div>
+                        <div class="qm-sub">after CD</div>
+                    </div>
+                    <div class="qm-item">
+                        <div class="qm-label">Profit</div>
+                        <div class={quarterProfitClass}>
+                            &#8377;{quarterProfit}
+                        </div>
+                        <div class="qm-sub">{quarterMargin} margin</div>
+                    </div>
+                </div>
+                <template if:false={hasQuarterSales}>
+                    <div class="qtr-empty">
+                        No delivered sales in {quarterLabel}.
+                    </div>
+                </template>
+            </div>
+        </template>
 
         <!-- SUMMARY STRIP -->
         <div class="summary-strip">
@@ -344,6 +393,40 @@
                         </div>
                     </div>
 
+                    <!-- Selected quarter's sales for this brand -->
+                    <template if:true={inv.showQuarter}>
+                        <template if:true={inv.quarterHasSales}>
+                            <div class="qtr-brand">
+                                <div class="qb-tag">
+                                    {inv.quarterLabelText}
+                                </div>
+                                <div class="qb-item">
+                                    <span class="qb-label">Sold</span>
+                                    <span class="qb-val">
+                                        {inv.quarterKg} KG
+                                    </span>
+                                </div>
+                                <div class="qb-item">
+                                    <span class="qb-label">Revenue</span>
+                                    <span class="qb-val">
+                                        &#8377;{inv.quarterRevenueVal}
+                                    </span>
+                                </div>
+                                <div class="qb-item">
+                                    <span class="qb-label">Profit</span>
+                                    <span class={inv.quarterProfitCls}>
+                                        &#8377;{inv.quarterProfitVal}
+                                    </span>
+                                </div>
+                            </div>
+                        </template>
+                        <template if:false={inv.quarterHasSales}>
+                            <div class="qtr-brand qtr-brand-empty">
+                                No sales in {inv.quarterLabelText}
+                            </div>
+                        </template>
+                    </template>
+
                     <!-- Footer -->
                     <div class="inv-card-footer">
                         <div class="inv-footer-left">
@@ -403,6 +486,15 @@
                         Sold: {inv.Quantity_Sold__c} KG total &middot;
                         Last purchased: {inv.formattedLastDate}
                     </div>
+                    <template if:true={inv.quarterHasSales}>
+                        <div class="oos-quarter">
+                            {inv.quarterLabelText}: {inv.quarterKg} KG &middot;
+                            &#8377;{inv.quarterRevenueVal} revenue &middot;
+                            <span class={inv.quarterProfitCls}>
+                                &#8377;{inv.quarterProfitVal} profit
+                            </span>
+                        </div>
+                    </template>
                 </div>
             </template>
         </template>

@@ -4,16 +4,24 @@ import { refreshApex } from '@salesforce/apex';
 import getInventory from '@salesforce/apex/InventoryViewController.getInventory';
 import getBrandDetail from '@salesforce/apex/InventoryViewController.getBrandDetail';
 import updateShrinkage from '@salesforce/apex/InventoryViewController.updateShrinkage';
+import getQuarterlySales from '@salesforce/apex/InventoryViewController.getQuarterlySales';
 
 const LOW_STOCK_THRESHOLD  = 10;  // KG
 const WARN_STOCK_THRESHOLD = 25;  // KG
+const ALL_TIME = 'ALL';           // quarter selector value for "All Time"
 
 export default class InventoryView extends LightningElement {
 
-    @track inventory    = [];
-    @track outOfStock   = [];
+    @track inStock      = [];
+    @track outOfStockRaw = [];
     @track isLoading    = true;
     wiredResult;
+
+    // Quarterly view — the stock figures on this screen are always "as of
+    // now"; the quarter only slices the SALES numbers (KG, revenue, profit).
+    @track quarters         = [];
+    @track selectedQuarter  = ALL_TIME;
+    quarterDefaulted        = false;
 
     @wire(getInventory)
     wiredInventory(result) {
@@ -83,8 +91,156 @@ export default class InventoryView extends LightningElement {
             });
         });
 
-        this.inventory  = inStock;
-        this.outOfStock = outOfStock;
+        this.inStock       = inStock;
+        this.outOfStockRaw = outOfStock;
+    }
+
+    // ── Quarterly sales ────────────────────────────────────────────────
+    @wire(getQuarterlySales)
+    wiredQuarters({ data }) {
+        if (!data) return;
+        this.quarters = data.map(q => {
+            const brands = {};
+            (q.brands || []).forEach(b => {
+                brands[b.key] = {
+                    kgSold:  parseFloat(b.kgSold)  || 0,
+                    revenue: parseFloat(b.revenue) || 0,
+                    profit:  parseFloat(b.profit)  || 0
+                };
+            });
+            return {
+                key:        q.key,
+                label:      q.label,
+                shortLabel: q.shortLabel,
+                rangeLabel: q.rangeLabel,
+                isCurrent:  q.isCurrent,
+                orders:     q.orders || 0,
+                kgSold:     parseFloat(q.kgSold)  || 0,
+                revenue:    parseFloat(q.revenue) || 0,
+                profit:     parseFloat(q.profit)  || 0,
+                brands
+            };
+        });
+        // Land on the quarter in progress so the screen opens on "now" —
+        // but never override a quarter the user has already picked.
+        if (!this.quarterDefaulted) {
+            const current = this.quarters.find(q => q.isCurrent);
+            if (current) this.selectedQuarter = current.key;
+            this.quarterDefaulted = true;
+        }
+    }
+
+    // Only offer quarters that actually have sales — plus the quarter in
+    // progress, which stays selectable even before its first sale.
+    get selectableQuarters() {
+        return this.quarters.filter(q => q.orders > 0 || q.isCurrent);
+    }
+
+    get quarterChips() {
+        const chips = this.selectableQuarters.map(q => ({
+            key:   q.key,
+            label: q.shortLabel,
+            cls:   this.selectedQuarter === q.key
+                ? 'qtr-chip qtr-chip-active' : 'qtr-chip'
+        }));
+        chips.push({
+            key:   ALL_TIME,
+            label: 'All Time',
+            cls:   this.selectedQuarter === ALL_TIME
+                ? 'qtr-chip qtr-chip-active' : 'qtr-chip'
+        });
+        return chips;
+    }
+
+    selectQuarter(e) {
+        this.selectedQuarter  = e.currentTarget.dataset.key;
+        this.quarterDefaulted = true;
+    }
+
+    get activeQuarter() {
+        return this.quarters.find(q => q.key === this.selectedQuarter) || null;
+    }
+
+    get isQuarterView() { return !!this.activeQuarter; }
+
+    get quarterLabel() {
+        const q = this.activeQuarter;
+        return q ? q.label : 'All Time';
+    }
+    get quarterRangeLabel() {
+        const q = this.activeQuarter;
+        return q ? q.rangeLabel : '';
+    }
+    get quarterOrders()  {
+        const q = this.activeQuarter;
+        return q ? q.orders : 0;
+    }
+    get quarterKg() {
+        const q = this.activeQuarter;
+        return q ? q.kgSold.toFixed(1) : '0.0';
+    }
+    get quarterRevenue() {
+        const q = this.activeQuarter;
+        return this.formatMoney(q ? q.revenue : 0);
+    }
+    get quarterProfit() {
+        const q = this.activeQuarter;
+        return this.formatMoney(q ? q.profit : 0);
+    }
+    get quarterProfitClass() {
+        const q = this.activeQuarter;
+        return q && q.profit < 0 ? 'qm-val red' : 'qm-val green';
+    }
+    get quarterMargin() {
+        const q = this.activeQuarter;
+        if (!q || q.revenue <= 0) return '—';
+        return ((q.profit / q.revenue) * 100).toFixed(1) + '%';
+    }
+    get hasQuarterSales() {
+        const q = this.activeQuarter;
+        return !!q && q.orders > 0;
+    }
+
+    formatMoney(val) {
+        return Math.round(parseFloat(val) || 0)
+            .toLocaleString('en-IN');
+    }
+
+    // Decorate a stock row with the selected quarter's sales for that
+    // brand + packet type (nothing added when viewing All Time).
+    decorateWithQuarter(row) {
+        const q = this.activeQuarter;
+        if (!q) return { ...row, showQuarter: false };
+
+        const stats = q.brands[(row.Brand__c || '') + '|' +
+                               (row.Packet_Type__c || '')];
+        if (!stats) {
+            return {
+                ...row,
+                showQuarter:      true,
+                quarterHasSales:  false,
+                quarterLabelText: q.label
+            };
+        }
+        return {
+            ...row,
+            showQuarter:       true,
+            quarterHasSales:   true,
+            quarterLabelText:  q.label,
+            quarterKg:         stats.kgSold.toFixed(1),
+            quarterRevenueVal: this.formatMoney(stats.revenue),
+            quarterProfitVal:  this.formatMoney(stats.profit),
+            quarterProfitCls:  stats.profit < 0
+                ? 'qb-val red' : 'qb-val green'
+        };
+    }
+
+    get inventory() {
+        return this.inStock.map(r => this.decorateWithQuarter(r));
+    }
+
+    get outOfStock() {
+        return this.outOfStockRaw.map(r => this.decorateWithQuarter(r));
     }
 
     processRow(inv, remaining, total, avgCost, value, pct, blocked, available) {
@@ -107,16 +263,16 @@ export default class InventoryView extends LightningElement {
     }
 
     // ── Summary getters ─────────────────────────────────────
-    get totalBrands() { return this.inventory.length; }
+    get totalBrands() { return this.inStock.length; }
 
     get totalKg() {
-        return this.inventory.reduce(
+        return this.inStock.reduce(
             (s, i) => s + (parseFloat(i.availableQty) || 0), 0
         ).toFixed(1);
     }
 
     get totalValue() {
-        return this.inventory.reduce(
+        return this.inStock.reduce(
             (s, i) => s + (
                 (parseFloat(i.availableQty)         || 0) *
                 (parseFloat(i.Avg_Cost_Per_Kg__c)   || 0)
@@ -125,14 +281,14 @@ export default class InventoryView extends LightningElement {
     }
 
     get lowStockCount() {
-        return this.inventory.filter(
+        return this.inStock.filter(
             i => (i.availableQty || 0) <= LOW_STOCK_THRESHOLD
         ).length;
     }
 
     get hasLowStock()     { return this.lowStockCount > 0; }
-    get hasOutOfStock()   { return this.outOfStock.length > 0; }
-    get outOfStockCount() { return this.outOfStock.length; }
+    get hasOutOfStock()   { return this.outOfStockRaw.length > 0; }
+    get outOfStockCount() { return this.outOfStockRaw.length; }
 
     // ── Shrinkage Modal ────────────────────────────────────
     @track isShrinkOpen   = false;
