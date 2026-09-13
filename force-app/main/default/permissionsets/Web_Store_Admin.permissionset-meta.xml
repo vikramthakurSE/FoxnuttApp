@@ -3,6 +3,14 @@
     <label>Web Store Admin</label>
     <hasActivationRequired>false</hasActivationRequired>
     <classAccesses>
+        <apexClass>PaymentReceiptController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>PaymentReceiptService</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
         <apexClass>AxisCreditAlertHandler</apexClass>
         <enabled>true</enabled>
     </classAccesses>
@@ -186,6 +194,10 @@
         <editable>true</editable>
         <readable>true</readable>
     </fieldPermissions>
+    <pageAccesses>
+        <apexPage>PaymentReceiptPDF</apexPage>
+        <enabled>true</enabled>
+    </pageAccesses>
     <tabSettings>
         <tab>Bank_Credit_Alert__c</tab>
         <visibility>Visible</visibility>

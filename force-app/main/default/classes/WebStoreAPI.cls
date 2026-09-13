@@ -7,6 +7,8 @@
  *   GET  /services/apexrest/store/v1/orders?phone=... → order history for a phone
  *   GET  /services/apexrest/store/v1/payment-due?code=… → old unpaid orders blocking checkout
  *   GET  /services/apexrest/store/v1/order-payment?ref=… → payment state of one web order
+ *   GET  /services/apexrest/store/v1/receipt?ref=…       → PDF receipt for one web order
+ *   GET  /services/apexrest/store/v1/receipt?ref=…       → PDF receipt for one web order
  *   POST /services/apexrest/store/v1/orders           → place an order
  */
 @RestResource(urlMapping='/store/v1/*')
@@ -46,6 +48,32 @@ global with sharing class WebStoreAPI {
                          .removeStart(', ').removeEnd(', '));
                 }
                 respond(res, 200, out);
+            } else if (path.contains('/receipt')) {
+                Blob pdf = PaymentReceiptService.renderForOrderRef(req.params.get('ref'));
+                if (pdf == null) {
+                    respond(res, 404, error('Receipt not found.'));
+                } else {
+                    // Overrides the default application/json set above —
+                    // RestResponse.addHeader keys on header name, so this
+                    // replaces rather than duplicates it.
+                    res.addHeader('Content-Type', 'application/pdf');
+                    res.addHeader('Content-Disposition', 'inline; filename="receipt.pdf"');
+                    res.statusCode = 200;
+                    res.responseBody = pdf;
+                }
+            } else if (path.contains('/receipt')) {
+                Blob pdf = PaymentReceiptService.renderForOrderRef(req.params.get('ref'));
+                if (pdf == null) {
+                    respond(res, 404, error('Receipt not found.'));
+                } else {
+                    // Overrides the default application/json set above —
+                    // RestResponse.addHeader keys on header name, so this
+                    // replaces rather than duplicates it.
+                    res.addHeader('Content-Type', 'application/pdf');
+                    res.addHeader('Content-Disposition', 'inline; filename="receipt.pdf"');
+                    res.statusCode = 200;
+                    res.responseBody = pdf;
+                }
             } else if (path.contains('/order-payment')) {
                 Map<String, Object> pay =
                     WebStoreService.getOrderPayment(req.params.get('ref'));

@@ -65,3 +65,40 @@ Until a `_paid` template exists and is approved, Meta answers #132001 and
 the code falls back to the standard template for that message, so nothing
 is lost while they are pending.
 
+## Colored PDF payment receipt
+
+Every paid order gets a proper receipt: `PaymentReceiptPDF` (Visualforce,
+`renderAs="pdf"`) draws a branded, colorful one-pager — status badge
+(PAID / PARTIALLY PAID / UNPAID), billed-to and payment-detail cards, an
+itemized order table, and the balance. `PaymentReceiptController` accepts
+either `?id=<Client_Payment__c Id>` (one payment) or `?ref=<Web_Order_Ref__c>`
+(an order's current state — what the website uses, since it only ever
+knows its own order reference).
+
+It's exposed publicly at `GET /store/v1/receipt?ref=…`, which returns the
+raw PDF bytes (`Content-Type: application/pdf`) rather than JSON. Two
+consumers:
+
+- The website proxies it at `/api/orders/receipt?ref=` so a customer can
+  download their receipt straight from the confirmation or orders page.
+- `WhatsAppHelper.sendReceiptLink` (fired from the same payment dispatch as
+  `payment_received`) sends a `payment_receipt` template with a **document
+  header** pointing at that same website URL — Meta fetches the PDF itself,
+  no media upload needed from Apex. Only web orders qualify: the receipt
+  route trusts `Web_Order_Ref__c` as an unguessable token the same way
+  `/order-payment` does, so a manually-entered sale (no ref) has no public
+  link and is skipped rather than exposed under a guessable Id or the
+  sequential order number.
+
+Two things to set up before this reaches a customer:
+
+1. **Custom Label `Web_Store_Base_URL`** (Setup → Custom Labels) — set it
+   to the website's public URL (e.g. `https://nuttynirvana.vercel.app`).
+   Left at its placeholder `unset`, the WhatsApp document is skipped
+   (the website download button still works regardless — it doesn't need
+   this label).
+2. **WhatsApp template `payment_receipt`** in Meta Business Manager —
+   header type **Document**, body `{{1}}` = order number. Until it's
+   approved, Meta answers #132001 and the send is silently skipped, same
+   fallback pattern as the `_paid` templates.
+
