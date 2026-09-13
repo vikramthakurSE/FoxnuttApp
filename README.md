@@ -98,7 +98,7 @@ Two things to set up before this reaches a customer:
    (the website download button still works regardless — it doesn't need
    this label).
 2. **WhatsApp template `payment_receipt`** in Meta Business Manager —
-   header type **Document**, body `{{1}}` = order number. Until it's
-   approved, Meta answers #132001 and the send is silently skipped, same
-   fallback pattern as the `_paid` templates.
+   header type **Document**, body `{{1}}` = client name, `{{2}}` = order
+   number. Until it's approved, Meta answers #132001 and the send is
+   silently skipped, same fallback pattern as the `_paid` templates.
 

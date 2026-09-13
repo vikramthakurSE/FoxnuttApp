@@ -586,7 +586,8 @@ public class WhatsAppHelper {
                     bal.setScale(0).format()
                 }));
 
-            sendReceiptLink(ph, p.Sale__r.Client__r.Unique_Business_Code__c,
+            sendReceiptLink(ph, p.Sale__r.Client__r.Name,
+                p.Sale__r.Client__r.Unique_Business_Code__c,
                 p.Sale__r.Name, p.Sale__r.Web_Order_Ref__c);
         }
     }
@@ -596,12 +597,13 @@ public class WhatsAppHelper {
     // manually-entered sale has none, so it is skipped rather than exposed
     // under a guessable Id or sequential order number).
     // Template: payment_receipt — header DOCUMENT (sent as {"link": ...}),
-    // body {{1}} order#. Silently does nothing until both the
-    // Web_Store_Base_URL custom label is set and the template is approved
-    // in Meta (a missing template answers #132001, same as the _paid
-    // fallbacks elsewhere in this class).
+    // body {{1}} client name, {{2}} order#. Silently does nothing until
+    // both the Web_Store_Base_URL custom label is set and the template is
+    // approved in Meta (a missing template answers #132001, same as the
+    // _paid fallbacks elsewhere in this class).
     private static void sendReceiptLink(
-        String phone, String businessCode, String saleName, String orderRef
+        String phone, String clientName, String businessCode,
+        String saleName, String orderRef
     ) {
         if (String.isBlank(orderRef)) return;
         String base = Label.Web_Store_Base_URL;
@@ -633,6 +635,10 @@ public class WhatsAppHelper {
                     new Map<String, Object>{
                         'type' => 'body',
                         'parameters' => new List<Object>{
+                            new Map<String, Object>{
+                                'type' => 'text',
+                                'text' => String.isBlank(clientName) ? 'there' : clientName
+                            },
                             new Map<String, Object>{
                                 'type' => 'text',
                                 'text' => String.isBlank(saleName) ? '-' : saleName
