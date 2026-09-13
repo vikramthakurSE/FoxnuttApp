@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>UPI_Payer_Name__c</fullName>
+    <description>Payer name as it appears in the bank's UPI credit alert (e.g. VIKRAM K). Learned from the first matched payment; used to match later payments even when amounts collide.</description>
+    <externalId>false</externalId>
+    <inlineHelpText>Name shown in the Axis credit alert when this client pays by UPI. Filled in automatically after the first matched payment; edit if it changes.</inlineHelpText>
+    <label>UPI Payer Name</label>
+    <length>120</length>
+    <required>false</required>
+    <trackFeedHistory>false</trackFeedHistory>
+    <trackTrending>false</trackTrending>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>

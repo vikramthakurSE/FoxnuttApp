@@ -322,6 +322,41 @@ private class WebStoreServiceTest {
     }
 
     @isTest
+    static void testOnlineOrderRecordsMethodAndExposesPaymentState() {
+        seedData();
+        WebStoreService.OrderInput input = orderInput('9876501234', 'web-ref-online', 2);
+        input.paymentMethod = 'online';
+        Test.startTest();
+        WebStoreService.OrderResult res = WebStoreService.placeOrder(input);
+        Test.stopTest();
+
+        Sale__c s = [SELECT Payment_Method__c, Order_Status__c
+                     FROM Sale__c WHERE Id = :res.saleId];
+        System.assertEquals('Online', s.Payment_Method__c);
+        System.assertEquals('Pending Approval', s.Order_Status__c);
+
+        Map<String, Object> pay = WebStoreService.getOrderPayment('web-ref-online');
+        System.assertEquals(res.saleName, pay.get('saleName'));
+        System.assertEquals(false, pay.get('paid'));
+        System.assertEquals(600, pay.get('balanceDue'));
+        System.assertEquals(null, WebStoreService.getOrderPayment('nope'));
+
+        RestContext.request  = new RestRequest();
+        RestContext.response = new RestResponse();
+        RestContext.request.requestURI = '/services/apexrest/store/v1/order-payment';
+        RestContext.request.httpMethod = 'GET';
+        RestContext.request.params.put('ref', 'web-ref-online');
+        WebStoreAPI.doGet();
+        System.assertEquals(200, RestContext.response.statusCode);
+        System.assert(RestContext.response.responseBody.toString()
+            .contains('"paid":false'));
+
+        // COD is the default when the website sends nothing.
+        System.assertEquals('Cash on Delivery', WebStoreService.paymentMethodOf(null));
+        System.assertEquals('Online', WebStoreService.paymentMethodOf(' ONLINE '));
+    }
+
+    @isTest
     static void testRestApi() {
         seedData();
 

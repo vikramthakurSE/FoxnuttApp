@@ -37,6 +37,16 @@
         <viewAllRecords>true</viewAllRecords>
     </objectPermissions>
     <fieldPermissions>
+        <field>Sale__c.Payment_Method__c</field>
+        <editable>true</editable>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Account.UPI_Payer_Name__c</field>
+        <editable>true</editable>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
         <field>Bank_Credit_Alert__c.Amount__c</field>
         <editable>true</editable>
         <readable>true</readable>

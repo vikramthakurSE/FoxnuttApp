@@ -11,9 +11,26 @@ public class WhatsAppHelper {
 
     // ── Core send ──────────────────────────────────────────────────────────
     private static void sendMessage(String payload) {
+        sendMessageWithResult(payload);
+    }
+
+    /**
+     * Orders that are already paid get a template with no balance line.
+     * Those templates may not exist in Meta yet (they need approval), so
+     * when Meta answers "template does not exist" (#132001) the standard
+     * template is sent instead — a message with "balance ₹0" beats no
+     * message at all.
+     */
+    private static void sendPaidOrStandard(String paidPayload, String stdPayload) {
+        String body = sendMessageWithResult(paidPayload);
+        if (body != null && body.contains('132001')) sendMessage(stdPayload);
+    }
+
+    /** Returns Meta's response body, or null when the call was not made. */
+    private static String sendMessageWithResult(String payload) {
         WhatsApp_Config__mdt cfg = getConfig();
         if (cfg == null) {
-            System.debug('WA: config not found'); return;
+            System.debug('WA: config not found'); return null;
         }
         HttpRequest req = new HttpRequest();
         req.setEndpoint(
@@ -28,12 +45,19 @@ public class WhatsAppHelper {
         try {
             HttpResponse res = new Http().send(req);
             System.debug('WA [' + res.getStatusCode() + ']: ' + res.getBody());
+            return res.getBody();
         } catch (Exception e) {
             System.debug('WA error: ' + e.getMessage());
+            return null;
         }
     }
 
     /** Header value for templates that show the client's login code. */
+    /** Money has come in and nothing is left to pay. */
+    private static Boolean isSettled(Decimal collected, Decimal balance) {
+        return collected != null && collected > 0
+            && (balance == null || balance <= 0);
+    }
     private static String hdr(String businessCode) {
         return String.isBlank(businessCode) ? '-' : businessCode;
     }
@@ -229,18 +253,25 @@ public class WhatsAppHelper {
     // Template: order_confirmed
     // {{1}} name, {{2}} order#, {{3}} products, {{4}} total, {{5}} delivery
     // ════════════════════════════════════════════════════════════════════════
+    // Paid variant: order_confirmed_paid, same variables, no payment line.
     @future(callout=true)
     public static void sendOrderConfirmed(
         String phone, String clientName, String saleName,
         String products, String total, String deliveryDate,
-        String businessCode
+        String businessCode, Boolean paid
     ) {
         String p = fmtPhone(phone);
         if (p == null) return;
-        sendMessage(buildPayloadWithTextHeader(
-            p, 'order_confirmed', hdr(businessCode),
-            new List<String>{ clientName, saleName,
-                              products, total, deliveryDate }));
+        List<String> params = new List<String>{ clientName, saleName,
+                                                products, total, deliveryDate };
+        String std = buildPayloadWithTextHeader(
+            p, 'order_confirmed', hdr(businessCode), params);
+        if (paid == true) {
+            sendPaidOrStandard(buildPayloadWithTextHeader(
+                p, 'order_confirmed_paid', hdr(businessCode), params), std);
+        } else {
+            sendMessage(std);
+        }
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -248,16 +279,24 @@ public class WhatsAppHelper {
     // Template: order_out_for_delivery
     // {{1}} name, {{2}} order#, {{3}} balance due
     // ════════════════════════════════════════════════════════════════════════
+    // Paid variant: order_out_for_delivery_paid — {{1}} name, {{2}} order#
     @future(callout=true)
     public static void sendOutForDelivery(
         String phone, String clientName,
-        String saleName, String balance, String businessCode
+        String saleName, String balance, String businessCode, Boolean paid
     ) {
         String p = fmtPhone(phone);
         if (p == null) return;
-        sendMessage(buildPayloadWithTextHeader(
+        String std = buildPayloadWithTextHeader(
             p, 'order_out_for_delivery', hdr(businessCode),
-            new List<String>{ clientName, saleName, balance }));
+            new List<String>{ clientName, saleName, balance });
+        if (paid == true) {
+            sendPaidOrStandard(buildPayloadWithTextHeader(
+                p, 'order_out_for_delivery_paid', hdr(businessCode),
+                new List<String>{ clientName, saleName }), std);
+        } else {
+            sendMessage(std);
+        }
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -265,18 +304,26 @@ public class WhatsAppHelper {
     // Template: order_delivered
     // {{1}} name, {{2}} order#, {{3}} total, {{4}} collected, {{5}} balance
     // ════════════════════════════════════════════════════════════════════════
+    // Paid variant: order_delivered_paid — {{1}} name, {{2}} order#, {{3}} total
     @future(callout=true)
     public static void sendOrderDelivered(
         String phone, String clientName, String saleName,
         String total, String collected, String balance,
-        String businessCode
+        String businessCode, Boolean paid
     ) {
         String p = fmtPhone(phone);
         if (p == null) return;
-        sendMessage(buildPayloadWithTextHeader(
+        String std = buildPayloadWithTextHeader(
             p, 'order_delivered', hdr(businessCode),
             new List<String>{ clientName, saleName,
-                              total, collected, balance }));
+                              total, collected, balance });
+        if (paid == true) {
+            sendPaidOrStandard(buildPayloadWithTextHeader(
+                p, 'order_delivered_paid', hdr(businessCode),
+                new List<String>{ clientName, saleName, total }), std);
+        } else {
+            sendMessage(std);
+        }
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -407,8 +454,17 @@ public class WhatsAppHelper {
         List<Sale__c> sales,
         Map<Id, List<Sale_Line_Item__c>> liMap
     ) {
+        // Callers' queries predate the payment fields; a web order paid
+        // online before approval must not be told to keep cash ready.
+        Map<Id, Sale__c> payState = new Map<Id, Sale__c>([
+            SELECT Id, Total_Collected__c, Balance_Due__c
+            FROM Sale__c WHERE Id IN :sales
+        ]);
         for (Sale__c s : sales) {
             if (String.isBlank(s.Client__r?.Phone)) continue;
+            Sale__c ps = payState.get(s.Id);
+            Boolean paid = ps != null && isSettled(ps.Total_Collected__c,
+                                                   ps.Balance_Due__c);
 
             List<Sale_Line_Item__c> items = liMap.containsKey(s.Id)
                 ? liMap.get(s.Id) : new List<Sale_Line_Item__c>();
@@ -432,7 +488,8 @@ public class WhatsAppHelper {
                 products,
                 total.setScale(2).format(),
                 delivery,
-                s.Client__r.Unique_Business_Code__c
+                s.Client__r.Unique_Business_Code__c,
+                paid
             );
         }
     }
@@ -446,12 +503,14 @@ public class WhatsAppHelper {
             Decimal rev   = s.Total_Revenue__c    != null ? s.Total_Revenue__c    : 0;
             Decimal col   = s.Total_Collected__c  != null ? s.Total_Collected__c  : 0;
             Decimal bal   = s.Balance_Due__c      != null ? s.Balance_Due__c      : 0;
+            Boolean paid  = isSettled(col, bal);
 
             if (status == 'Out for Delivery') {
                 sendOutForDelivery(
                     s.Client__r.Phone, s.Client__r.Name, s.Name,
                     bal.setScale(0).format(),
-                    s.Client__r.Unique_Business_Code__c
+                    s.Client__r.Unique_Business_Code__c,
+                    paid
                 );
             } else if (status == 'Delivered') {
                 sendOrderDelivered(
@@ -459,7 +518,8 @@ public class WhatsAppHelper {
                     'Rs ' + rev.setScale(0).format(),
                     'Rs ' + col.setScale(0).format(),
                     bal.setScale(0).format(),
-                    s.Client__r.Unique_Business_Code__c
+                    s.Client__r.Unique_Business_Code__c,
+                    paid
                 );
             } else if (status == 'Cancelled') {
                 sendOrderCancelled(
