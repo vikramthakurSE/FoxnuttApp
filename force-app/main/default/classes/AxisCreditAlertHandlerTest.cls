@@ -135,6 +135,45 @@ private class AxisCreditAlertHandlerTest {
     }
 
     @isTest
+    static void testOnlineOrderAwaitingApprovalIsMatched() {
+        Account a = new Account(Name = 'Web Buyer', Phone = '+91 98453 88888');
+        insert a;
+        insert new Inventory__c(
+            Name = 'INV-web', Brand__c = 'Holiday_250g', Packet_Type__c = '250g',
+            Total_Quantity__c = 100, Remaining_Quantity__c = 100,
+            Avg_Cost_Per_Kg__c = 900);
+        // A fresh web order, paid online, not yet approved by a human.
+        Sale__c s = new Sale__c(
+            Client__c = a.Id, Sale_Date__c = Date.today(),
+            Order_Status__c = 'Pending Approval', Payment_Method__c = 'Online');
+        insert s;
+        insert new Sale_Line_Item__c(
+            Sale__c = s.Id, Brand__c = 'Holiday_250g', Packet_Type__c = '250g',
+            Quantity__c = 0.75, Rate_Per_Kg__c = 1000);   // ₹750
+        // A COD order in the same state must stay out of the running.
+        Sale__c cod = new Sale__c(
+            Client__c = a.Id, Sale_Date__c = Date.today(),
+            Order_Status__c = 'Pending Approval');
+        insert cod;
+        insert new Sale_Line_Item__c(
+            Sale__c = cod.Id, Brand__c = 'Holiday_250g', Packet_Type__c = '250g',
+            Quantity__c = 0.75, Rate_Per_Kg__c = 1000);
+
+        Test.startTest();
+        Bank_Credit_Alert__c alert = AxisCreditAlertHandler.process(
+            'INR 750.00 was credited to your A/c.',
+            body('750.00', '600000000001', 'WEB BUYER', 'Paym'));
+        Test.stopTest();
+
+        System.assertEquals('Matched', alert.Status__c);
+        System.assertEquals(s.Id, alert.Sale__c);
+        System.assertEquals(0,
+            [SELECT Balance_Due__c FROM Sale__c WHERE Id = :s.Id].Balance_Due__c);
+        System.assertEquals(750,
+            [SELECT Balance_Due__c FROM Sale__c WHERE Id = :cod.Id].Balance_Due__c);
+    }
+
+    @isTest
     static void testUnmatchedNeedsReviewWithTask() {
         Account a = new Account(Name = 'Alpha Traders', Phone = '+91 98453 44444');
         insert a;

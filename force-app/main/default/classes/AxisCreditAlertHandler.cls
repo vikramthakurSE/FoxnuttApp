@@ -192,7 +192,12 @@ global with sharing class AxisCreditAlertHandler
                    Balance_Due__c, Sale_Date__c, Order_Status__c
             FROM Sale__c
             WHERE Balance_Due__c > 0
-            AND Order_Status__c NOT IN ('Cancelled', 'Pending Approval')
+            AND Order_Status__c != 'Cancelled'
+            // A COD order awaiting review has nothing to pay yet, but an
+            // online order is expected to be paid right after checkout,
+            // before anyone has approved it.
+            AND (Order_Status__c != 'Pending Approval'
+                 OR Payment_Method__c = 'Online')
             ORDER BY Sale_Date__c ASC, Name ASC
         ];
     }

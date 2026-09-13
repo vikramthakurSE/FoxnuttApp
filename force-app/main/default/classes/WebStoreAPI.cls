@@ -6,6 +6,7 @@
  *   GET  /services/apexrest/store/v1/catalog          → product catalog + availability
  *   GET  /services/apexrest/store/v1/orders?phone=... → order history for a phone
  *   GET  /services/apexrest/store/v1/payment-due?code=… → old unpaid orders blocking checkout
+ *   GET  /services/apexrest/store/v1/order-payment?ref=… → payment state of one web order
  *   POST /services/apexrest/store/v1/orders           → place an order
  */
 @RestResource(urlMapping='/store/v1/*')
@@ -45,6 +46,17 @@ global with sharing class WebStoreAPI {
                          .removeStart(', ').removeEnd(', '));
                 }
                 respond(res, 200, out);
+            } else if (path.contains('/order-payment')) {
+                Map<String, Object> pay =
+                    WebStoreService.getOrderPayment(req.params.get('ref'));
+                // 200 with found=false: "not synced yet" is a normal state
+                // for the website's polling, not an error.
+                if (pay == null) {
+                    respond(res, 200, new Map<String, Object>{ 'found' => false });
+                } else {
+                    pay.put('found', true);
+                    respond(res, 200, pay);
+                }
             } else if (path.contains('/payment-due')) {
                 // What a logged-in client must pay before ordering again.
                 List<WebStoreService.OverdueSale> due =

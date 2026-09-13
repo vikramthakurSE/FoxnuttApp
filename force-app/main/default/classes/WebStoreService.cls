@@ -55,6 +55,7 @@ public without sharing class WebStoreService {
         public String gstin;          // optional
         public String note;           // optional customer note
         public String orderRef;       // idempotency key from the website
+        public String paymentMethod;  // 'online' | 'cod' (default)
         public List<OrderItemInput> items;
     }
     public class RegisterInput {
@@ -681,6 +682,7 @@ public without sharing class WebStoreService {
                 Sale_Date__c       = Date.today(),
                 Order_Status__c    = status,
                 Order_Source__c    = 'Website',
+                Payment_Method__c  = paymentMethodOf(input.paymentMethod),
                 Web_Order_Ref__c   = left(input.orderRef, 64),
                 Delivery_Address__c = left(input.address, 1000),
                 Notes_Remarks__c   = left(input.note, 255)
@@ -742,7 +744,8 @@ public without sharing class WebStoreService {
         List<Map<String, Object>> out = new List<Map<String, Object>>();
         for (Sale__c s : [
             SELECT Id, Name, Sale_Date__c, Order_Status__c,
-                   Payment_Status__c, Total_Revenue__c, Total_Collected__c,
+                   Payment_Status__c, Payment_Method__c,
+                   Total_Revenue__c, Total_Collected__c,
                    Balance_Due__c, Expected_Delivery_Date__c,
                    Web_Order_Ref__c,
                    (SELECT Id, Brand__c, Packet_Type__c, Quantity__c,
@@ -775,6 +778,7 @@ public without sharing class WebStoreService {
                 'saleDate'      => String.valueOf(s.Sale_Date__c),
                 'status'        => s.Order_Status__c,
                 'paymentStatus' => s.Payment_Status__c,
+                'paymentMethod' => s.Payment_Method__c,
                 'total'         => s.Total_Revenue__c,
                 'collected'     => s.Total_Collected__c,
                 'balanceDue'    => s.Balance_Due__c,
@@ -785,6 +789,44 @@ public without sharing class WebStoreService {
             });
         }
         return out;
+    }
+
+    // ── Online payment ───────────────────────────────────────────────────
+    public static String paymentMethodOf(String raw) {
+        return String.isNotBlank(raw) && raw.trim().toLowerCase() == 'online'
+            ? 'Online' : 'Cash on Delivery';
+    }
+
+    /**
+     * Payment state of one web order, looked up by the website's own
+     * order reference (a random UUID only the ordering browser knows).
+     * Null when no such order has reached Salesforce yet.
+     */
+    public static Map<String, Object> getOrderPayment(String orderRef) {
+        if (String.isBlank(orderRef)) return null;
+        List<Sale__c> rows = [
+            SELECT Id, Name, Order_Status__c, Payment_Method__c,
+                   Payment_Status__c, Total_Revenue__c, Total_Collected__c,
+                   Balance_Due__c
+            FROM Sale__c WHERE Web_Order_Ref__c = :orderRef LIMIT 1
+        ];
+        if (rows.isEmpty()) return null;
+        Sale__c s = rows[0];
+        Decimal bal = s.Balance_Due__c == null ? 0 : s.Balance_Due__c;
+        return new Map<String, Object>{
+            'saleId'        => s.Id,
+            'saleName'      => s.Name,
+            'status'        => s.Order_Status__c,
+            'paymentMethod' => s.Payment_Method__c,
+            'paymentStatus' => s.Payment_Status__c,
+            'total'         => s.Total_Revenue__c,
+            'collected'     => s.Total_Collected__c,
+            'balanceDue'    => bal,
+            'paid'          => s.Order_Status__c != 'Cancelled'
+                               && (s.Total_Collected__c != null
+                                   && s.Total_Collected__c > 0)
+                               && bal <= 0
+        };
     }
 
     // ── Overdue payments ─────────────────────────────────────────────────
