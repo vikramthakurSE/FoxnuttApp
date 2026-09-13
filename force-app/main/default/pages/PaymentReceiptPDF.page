@@ -1,0 +1,168 @@
+<apex:page controller="PaymentReceiptController" renderAs="pdf" showHeader="false"
+           standardStylesheets="false" applyBodyTag="false" applyHtmlTag="false"
+           cache="false">
+<html>
+<head>
+<style type="text/css">
+  @page { size: A4; margin: 0; }
+  body { margin:0; padding:0; font-family: Helvetica, Arial, sans-serif; color:#2e1f14; font-size:11px; }
+  table { border-collapse: collapse; width:100%; }
+  .band { background-color:#9e3115; padding:22px 32px; }
+  .band .brand { color:#faf3e6; font-size:24px; font-weight:bold; }
+  .band .brand .accent { color:#e9ddf7; }
+  .band .doc { color:#f3e8d2; font-size:12px; margin-top:2px; }
+  .band .saleNo { color:#ffffff; font-size:18px; font-weight:bold; text-align:right; }
+  .band .saleDate { color:#f3e8d2; font-size:11px; text-align:right; }
+  .goldbar { background-color:#b8862f; height:5px; }
+  .content { padding: 22px 32px; }
+  .badge { display:inline; padding:5px 14px; font-size:11px; font-weight:bold; color:#ffffff; }
+  .badge-paid { background-color:#5c7a1e; }
+  .badge-partial { background-color:#b8862f; }
+  .badge-unpaid { background-color:#c2401f; }
+  .infoTable td { vertical-align:top; padding:0; }
+  .card { border:1px solid #e7d9bd; background-color:#fffdf7; padding:12px 14px; }
+  .cardTitle { color:#9e3115; font-size:10px; font-weight:bold; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px; }
+  .cardLine { font-size:11.5px; color:#2e1f14; margin:2px 0; }
+  .cardLabel { color:#6b5744; font-size:10px; }
+  .sectionTitle { color:#9e3115; font-size:12px; font-weight:bold; text-transform:uppercase; letter-spacing:0.04em; margin:20px 0 8px 0; }
+  .items th { background-color:#2e1f14; color:#faf3e6; font-size:10px; text-transform:uppercase; padding:8px 10px; text-align:left; }
+  .items th.num, .items td.num { text-align:right; }
+  .items td { padding:8px 10px; font-size:11px; border-bottom:1px solid #e7d9bd; }
+  .items tr.alt td { background-color:#faf3e6; }
+  .totals { margin-top:14px; }
+  .totals table { width:260px; margin-left:auto; }
+  .totals td { padding:5px 4px; font-size:11.5px; }
+  .totals .label { color:#6b5744; }
+  .totals .value { text-align:right; font-weight:bold; }
+  .totals .grand td { border-top:2px solid #9e3115; padding-top:8px; font-size:14px; }
+  .totals .grand .label { color:#2e1f14; }
+  .balanceOk { color:#5c7a1e; }
+  .balanceDue { color:#c2401f; }
+  .thanks { margin-top:26px; padding:14px 16px; background-color:#f3e8d2; border-left:4px solid #b8862f; }
+  .thanks .h { font-weight:bold; color:#2e1f14; font-size:12px; }
+  .thanks .p { color:#6b5744; font-size:10.5px; margin-top:3px; }
+  .footer { margin-top:24px; text-align:center; color:#a89478; font-size:9px; }
+  .notFound { padding:60px 32px; text-align:center; color:#6b5744; font-size:13px; }
+</style>
+</head>
+<body>
+
+<apex:outputPanel rendered="{!!found}">
+  <div class="notFound">Receipt not found. If you just paid, please check again in a minute.</div>
+</apex:outputPanel>
+
+<apex:outputPanel rendered="{!found}">
+  <table class="band">
+    <tr>
+      <td>
+        <div class="brand">NUTTY<span class="accent"> NIRVANA</span></div>
+        <div class="doc">Payment Receipt</div>
+      </td>
+      <td style="width:200px;">
+        <div class="saleNo">{!sale.Name}</div>
+        <div class="saleDate"><apex:outputText value="{0,date,d MMM yyyy}"><apex:param value="{!sale.Sale_Date__c}"/></apex:outputText></div>
+      </td>
+    </tr>
+  </table>
+  <div class="goldbar"/>
+
+  <div class="content">
+
+    <apex:outputPanel layout="none" rendered="{!statusLabel == 'PAID'}">
+      <span class="badge badge-paid">✓ PAID IN FULL</span>
+    </apex:outputPanel>
+    <apex:outputPanel layout="none" rendered="{!statusLabel == 'PARTIALLY PAID'}">
+      <span class="badge badge-partial">PARTIALLY PAID</span>
+    </apex:outputPanel>
+    <apex:outputPanel layout="none" rendered="{!statusLabel == 'UNPAID'}">
+      <span class="badge badge-unpaid">UNPAID</span>
+    </apex:outputPanel>
+
+    <table class="infoTable" style="margin-top:16px;">
+      <tr>
+        <td style="width:50%; padding-right:8px;">
+          <div class="card">
+            <div class="cardTitle">Billed To</div>
+            <div class="cardLine"><b>{!sale.Client__r.Name}</b></div>
+            <apex:outputPanel layout="none" rendered="{!AND(NOT(ISBLANK(sale.Client__r.Contact_Person__c)), sale.Client__r.Contact_Person__c != sale.Client__r.Name)}">
+              <div class="cardLine">{!sale.Client__r.Contact_Person__c}</div>
+            </apex:outputPanel>
+            <div class="cardLine">{!sale.Client__r.Phone}</div>
+            <apex:outputPanel layout="none" rendered="{!NOT(ISBLANK(sale.Client__r.Unique_Business_Code__c))}">
+              <div class="cardLine"><span class="cardLabel">Business ID:</span> {!sale.Client__r.Unique_Business_Code__c}</div>
+            </apex:outputPanel>
+          </div>
+        </td>
+        <td style="width:50%; padding-left:8px;">
+          <div class="card">
+            <div class="cardTitle">Payment Details</div>
+            <apex:outputPanel layout="none" rendered="{!NOT(ISNULL(payment))}">
+              <div class="cardLine"><span class="cardLabel">Paid on:</span> <apex:outputText value="{0,date,d MMM yyyy}"><apex:param value="{!payment.Payment_Date__c}"/></apex:outputText></div>
+              <div class="cardLine"><span class="cardLabel">Mode:</span> {!payment.Mode_of_Payment__c}</div>
+              <apex:outputPanel layout="none" rendered="{!NOT(ISBLANK(payment.Reference__c))}">
+                <div class="cardLine"><span class="cardLabel">Reference:</span> {!payment.Reference__c}</div>
+              </apex:outputPanel>
+            </apex:outputPanel>
+            <apex:outputPanel layout="none" rendered="{!ISNULL(payment)}">
+              <div class="cardLine"><span class="cardLabel">Order status:</span> {!sale.Order_Status__c}</div>
+              <div class="cardLine"><span class="cardLabel">Payment method:</span> {!sale.Payment_Method__c}</div>
+            </apex:outputPanel>
+            <div class="cardLine"><span class="cardLabel">Receipt generated:</span> {!generatedOn}</div>
+          </div>
+        </td>
+      </tr>
+    </table>
+
+    <div class="sectionTitle">Order Summary</div>
+    <table class="items">
+      <tr>
+        <th>Brand</th><th>Pack</th><th class="num">Qty (kg)</th><th class="num">Rate/kg</th><th class="num">Amount</th>
+      </tr>
+      <apex:repeat value="{!lines}" var="li" rendered="{!lines.size > 0}">
+        <tr>
+          <td>{!li.Brand__c}</td>
+          <td>{!li.Packet_Type__c}</td>
+          <td class="num"><apex:outputText value="{0,number,##0.00}"><apex:param value="{!li.Quantity__c}"/></apex:outputText></td>
+          <td class="num"><apex:outputText value="₹{0,number,##,##0}"><apex:param value="{!li.Rate_Per_Kg__c}"/></apex:outputText></td>
+          <td class="num"><apex:outputText value="₹{0,number,##,##0.00}"><apex:param value="{!li.Line_Amount__c}"/></apex:outputText></td>
+        </tr>
+      </apex:repeat>
+    </table>
+
+    <div class="totals">
+      <table>
+        <tr>
+          <td class="label">Order total</td>
+          <td class="value"><apex:outputText value="₹{0,number,##,##0.00}"><apex:param value="{!sale.Total_Revenue__c}"/></apex:outputText></td>
+        </tr>
+        <apex:outputPanel layout="none" rendered="{!NOT(ISNULL(payment))}">
+          <tr>
+            <td class="label">This payment</td>
+            <td class="value"><apex:outputText value="₹{0,number,##,##0.00}"><apex:param value="{!headlineAmount}"/></apex:outputText></td>
+          </tr>
+        </apex:outputPanel>
+        <tr>
+          <td class="label">Total collected to date</td>
+          <td class="value"><apex:outputText value="₹{0,number,##,##0.00}"><apex:param value="{!sale.Total_Collected__c}"/></apex:outputText></td>
+        </tr>
+        <tr class="grand">
+          <td class="label">Balance due</td>
+          <td class="value {!IF(sale.Balance_Due__c > 0, 'balanceDue', 'balanceOk')}">
+            <apex:outputText value="₹{0,number,##,##0.00}"><apex:param value="{!sale.Balance_Due__c}"/></apex:outputText>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="thanks">
+      <div class="h">Thank you for choosing Nutty Nirvana!</div>
+      <div class="p">100% natural makhana, no additives, FSSAI registered. This is a computer-generated receipt and needs no signature. For any question about this order, message us on WhatsApp with your Business ID.</div>
+    </div>
+
+    <div class="footer">Nutty Nirvana Snacks &#8226; generated {!generatedOn}</div>
+  </div>
+</apex:outputPanel>
+
+</body>
+</html>
+</apex:page>

@@ -560,6 +560,7 @@ public class WhatsAppHelper {
     public static void dispatchPaymentReceivedAsync(Set<Id> paymentIds) {
         for (Client_Payment__c p : [
             SELECT Amount__c, Sale__r.Name, Sale__r.Balance_Due__c,
+                   Sale__r.Web_Order_Ref__c,
                    Sale__r.Client__r.Name, Sale__r.Client__r.Phone,
                    Sale__r.Client__r.Unique_Business_Code__c
             FROM Client_Payment__c
@@ -584,7 +585,64 @@ public class WhatsAppHelper {
                     p.Sale__r.Name,
                     bal.setScale(0).format()
                 }));
+
+            sendReceiptLink(ph, p.Sale__r.Client__r.Unique_Business_Code__c,
+                p.Sale__r.Name, p.Sale__r.Web_Order_Ref__c);
         }
+    }
+
+    // ── Receipt PDF link — only for web orders (Web_Order_Ref__c is the
+    // unguessable token the public /api/orders/receipt route trusts; a
+    // manually-entered sale has none, so it is skipped rather than exposed
+    // under a guessable Id or sequential order number).
+    // Template: payment_receipt — header DOCUMENT (sent as {"link": ...}),
+    // body {{1}} order#. Silently does nothing until both the
+    // Web_Store_Base_URL custom label is set and the template is approved
+    // in Meta (a missing template answers #132001, same as the _paid
+    // fallbacks elsewhere in this class).
+    private static void sendReceiptLink(
+        String phone, String businessCode, String saleName, String orderRef
+    ) {
+        if (String.isBlank(orderRef)) return;
+        String base = Label.Web_Store_Base_URL;
+        if (String.isBlank(base) || base == 'unset') return;
+        String link = base.removeEnd('/') +
+            '/api/orders/receipt?ref=' + EncodingUtil.urlEncode(orderRef, 'UTF-8');
+
+        Map<String, Object> payload = new Map<String, Object>{
+            'messaging_product' => 'whatsapp',
+            'to'   => phone,
+            'type' => 'template',
+            'template' => new Map<String, Object>{
+                'name'     => 'payment_receipt',
+                'language' => new Map<String, Object>{ 'code' => 'en_US' },
+                'components' => new List<Object>{
+                    new Map<String, Object>{
+                        'type' => 'header',
+                        'parameters' => new List<Object>{
+                            new Map<String, Object>{
+                                'type' => 'document',
+                                'document' => new Map<String, Object>{
+                                    'link' => link,
+                                    'filename' => (String.isBlank(saleName)
+                                        ? 'Receipt' : saleName) + '.pdf'
+                                }
+                            }
+                        }
+                    },
+                    new Map<String, Object>{
+                        'type' => 'body',
+                        'parameters' => new List<Object>{
+                            new Map<String, Object>{
+                                'type' => 'text',
+                                'text' => String.isBlank(saleName) ? '-' : saleName
+                            }
+                        }
+                    }
+                }
+            }
+        };
+        sendMessage(JSON.serialize(payload));
     }
 
     // ── 7. Order Follow-Up — called from FollowUpNotificationHelper ─────────
