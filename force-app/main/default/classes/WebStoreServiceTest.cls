@@ -357,6 +357,60 @@ private class WebStoreServiceTest {
     }
 
     @isTest
+    static void testSavedAddressesNewestFirstDedupedWithAccountFallback() {
+        Account a = new Account(
+            Name  = 'Address Client',
+            Phone = '+91 93333 44444',
+            ShippingStreet = '5 Station Road',
+            ShippingCity   = 'Purnia'
+        );
+        insert a;
+        insert new List<Sale__c>{
+            new Sale__c(Client__c = a.Id, Sale_Date__c = Date.today().addDays(-30),
+                        Order_Status__c = 'Confirmed',
+                        Delivery_Address__c = '12 MG Road, Bengaluru'),
+            new Sale__c(Client__c = a.Id, Sale_Date__c = Date.today().addDays(-2),
+                        Order_Status__c = 'Confirmed',
+                        Delivery_Address__c = 'Shop 3, Market Lane, Patna'),
+            // Same place as the first, typed differently: listed once.
+            new Sale__c(Client__c = a.Id, Sale_Date__c = Date.today().addDays(-1),
+                        Order_Status__c = 'Confirmed',
+                        Delivery_Address__c = '12 mg road,  Bengaluru.'),
+            // Cancelled orders do not contribute addresses.
+            new Sale__c(Client__c = a.Id, Sale_Date__c = Date.today(),
+                        Order_Status__c = 'Cancelled',
+                        Delivery_Address__c = 'Wrong Address 99'),
+            new Sale__c(Client__c = a.Id, Sale_Date__c = Date.today().addDays(-5),
+                        Order_Status__c = 'Confirmed')
+        };
+        String code = [SELECT Unique_Business_Code__c FROM Account
+                       WHERE Id = :a.Id].Unique_Business_Code__c;
+
+        Test.startTest();
+        List<Map<String, Object>> saved = WebStoreService.getSavedAddresses(code);
+        Test.stopTest();
+
+        System.assertEquals(3, saved.size(), saved);
+        System.assertEquals('12 mg road,  Bengaluru.', saved[0].get('address'));
+        System.assertEquals('order', saved[0].get('source'));
+        System.assertEquals('Shop 3, Market Lane, Patna', saved[1].get('address'));
+        System.assertEquals('5 Station Road, Purnia', saved[2].get('address'));
+        System.assertEquals('account', saved[2].get('source'));
+
+        System.assert(WebStoreService.getSavedAddresses('NOPE00000').isEmpty());
+
+        RestContext.request  = new RestRequest();
+        RestContext.response = new RestResponse();
+        RestContext.request.requestURI = '/services/apexrest/store/v1/addresses';
+        RestContext.request.httpMethod = 'GET';
+        RestContext.request.params.put('code', code);
+        WebStoreAPI.doGet();
+        System.assertEquals(200, RestContext.response.statusCode);
+        System.assert(RestContext.response.responseBody.toString()
+            .contains('Market Lane'));
+    }
+
+    @isTest
     static void testRestApi() {
         seedData();
 
