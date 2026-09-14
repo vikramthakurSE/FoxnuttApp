@@ -4,7 +4,7 @@
     <label>Total Expenses</label>
     <precision>18</precision>
     <required>false</required>
-    <scale>0</scale>
+    <scale>2</scale>
     <trackHistory>false</trackHistory>
     <trackTrending>false</trackTrending>
     <type>Currency</type>

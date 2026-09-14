@@ -483,6 +483,12 @@ export default class PersonFundsView extends LightningElement {
     get compactTeamWithdrawn() { return this.compact(this.teamWithdrawn); }
     get compactTeamAvailable() { return this.compact(this.displayedTeamAvailable); }
 
+    // All-time cash in hand for one person, from their Person_Fund__c ledger
+    cashInHandFor(name) {
+        const pf = (this.personFunds || []).find(f => f.Name === name);
+        return pf ? pf.formattedAvail : this.fmt(0);
+    }
+
     get quarterPersonCards() {
         if (!this.qtrData) return [];
         return (this.qtrData.personSummaries || []).map(p => ({
@@ -492,6 +498,7 @@ export default class PersonFundsView extends LightningElement {
             fmtMfrPaid   : this.fmt(p.mfrPaid),
             fmtExpenses  : this.fmt(p.expenses),
             fmtNetFlow   : this.fmt(Math.abs(p.netFlow)),
+            fmtCashInHand: this.cashInHandFor(p.name),
             netFlowClass : parseFloat(p.netFlow) >= 0
                            ? 'pc-avail-amt positive'
                            : 'pc-avail-amt negative'

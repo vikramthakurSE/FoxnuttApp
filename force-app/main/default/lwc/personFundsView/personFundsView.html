@@ -383,6 +383,13 @@
             <template if:true={isAllTime}>
                 <div class="tc-updated">Updated {teamLastUpdated}</div>
             </template>
+            <!-- A quarter's net flow is not the money in hand — keep today's
+                 cash in hand visible so the two aren't confused -->
+            <template if:false={isAllTime}>
+                <div class="tc-updated">
+                    Cash in hand today: &#8377;{teamAvailable}
+                </div>
+            </template>
         </div>
 
         <!-- QUARTERLY PERSON CARDS — shown when quarter selected -->
@@ -406,6 +413,9 @@
                                 <div class="pc-avail-label">NET FLOW</div>
                                 <div class={p.netFlowClass}>
                                     &#8377;{p.fmtNetFlow}
+                                </div>
+                                <div class="pc-avail-label">
+                                    In hand today &#8377;{p.fmtCashInHand}
                                 </div>
                             </div>
                         </div>

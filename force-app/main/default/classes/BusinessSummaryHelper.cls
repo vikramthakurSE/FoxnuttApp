@@ -2,25 +2,39 @@ public class BusinessSummaryHelper {
 
     private static final String SUMMARY_NAME = 'MAKHANA_SUMMARY';
 
-    // ── Core: update Business_Summary__c total fields ─────────────────
-    public static void updateTotal(String fieldName, Decimal delta) {
-        if (delta == 0) return;
+    // ── Core: rebuild Business_Summary__c from Person_Fund__c ─────────
+    // The summary is the team total of the person ledgers. It used to keep
+    // its own running deltas, which never saw opening balances, transfers
+    // or withdrawals (those only touch Person_Fund__c), so it drifted tens
+    // of thousands of rupees away. Recomputing from the ledgers on every
+    // Person_Fund__c change (PersonFundSummaryTrigger) keeps them equal.
+    public static void syncFromPersonFunds() {
+        AggregateResult ar = [
+            SELECT SUM(Total_Collected__c) collected,
+                   SUM(Total_Mfr_Paid__c)  mfrPaid,
+                   SUM(Total_Expenses__c)  expenses,
+                   SUM(Total_Withdrawn__c) withdrawn
+            FROM   Person_Fund__c
+        ];
 
         List<Business_Summary__c> summaries = [
-            SELECT Id, Total_Collected__c, Total_Mfr_Paid__c,
-                   Total_Expenses__c, Last_Updated__c
-            FROM   Business_Summary__c
+            SELECT Id FROM Business_Summary__c
             WHERE  Name = :SUMMARY_NAME
             LIMIT  1
         ];
-        if (summaries.isEmpty()) return;
+        Business_Summary__c s = summaries.isEmpty()
+            ? new Business_Summary__c(Name = SUMMARY_NAME)
+            : summaries[0];
 
-        Business_Summary__c s = summaries[0];
-        Decimal cur = (Decimal) s.get(fieldName);
-        s.put(fieldName, (cur != null ? cur : 0) + delta);
-        s.Last_Updated__c = DateTime.now();
-        update s;
+        s.Total_Collected__c = nz((Decimal) ar.get('collected'));
+        s.Total_Mfr_Paid__c  = nz((Decimal) ar.get('mfrPaid'));
+        s.Total_Expenses__c  = nz((Decimal) ar.get('expenses'));
+        s.Total_Withdrawn__c = nz((Decimal) ar.get('withdrawn'));
+        s.Last_Updated__c    = DateTime.now();
+        upsert s;
     }
+
+    private static Decimal nz(Decimal d) { return d != null ? d : 0; }
 
     // ── Core: update Person_Fund__c records dynamically ───────────────
     // personDeltas: Map of person name → delta amount (+ or -)
@@ -102,22 +116,18 @@ public class BusinessSummaryHelper {
         List<Client_Payment__c> oldList
     ) {
         Map<String, Decimal> deltas = new Map<String, Decimal>();
-        Decimal totalDelta = 0;
 
         if (newList != null) {
             Map<String, Decimal> d = buildDeltas(
                 newList, 'Amount__c', 'Accepted_By__c', 1);
             deltas = mergeDeltas(deltas, d);
-            for (Decimal v : d.values()) totalDelta += v;
         }
         if (oldList != null) {
             Map<String, Decimal> d = buildDeltas(
                 oldList, 'Amount__c', 'Accepted_By__c', -1);
             deltas = mergeDeltas(deltas, d);
-            for (Decimal v : d.values()) totalDelta += v;
         }
 
-        updateTotal('Total_Collected__c', totalDelta);
         updatePersonFunds('Total_Collected__c', deltas);
     }
 
@@ -127,22 +137,18 @@ public class BusinessSummaryHelper {
         List<Manufacturer_Payment__c> oldList
     ) {
         Map<String, Decimal> deltas = new Map<String, Decimal>();
-        Decimal totalDelta = 0;
 
         if (newList != null) {
             Map<String, Decimal> d = buildDeltas(
                 newList, 'Amount_Paid__c', 'Paid_By__c', 1);
             deltas = mergeDeltas(deltas, d);
-            for (Decimal v : d.values()) totalDelta += v;
         }
         if (oldList != null) {
             Map<String, Decimal> d = buildDeltas(
                 oldList, 'Amount_Paid__c', 'Paid_By__c', -1);
             deltas = mergeDeltas(deltas, d);
-            for (Decimal v : d.values()) totalDelta += v;
         }
 
-        updateTotal('Total_Mfr_Paid__c', totalDelta);
         updatePersonFunds('Total_Mfr_Paid__c', deltas);
     }
 
@@ -152,22 +158,18 @@ public class BusinessSummaryHelper {
         List<Expense__c> oldList
     ) {
         Map<String, Decimal> deltas = new Map<String, Decimal>();
-        Decimal totalDelta = 0;
 
         if (newList != null) {
             Map<String, Decimal> d = buildDeltas(
                 newList, 'Amount__c', 'Spent_By__c', 1);
             deltas = mergeDeltas(deltas, d);
-            for (Decimal v : d.values()) totalDelta += v;
         }
         if (oldList != null) {
             Map<String, Decimal> d = buildDeltas(
                 oldList, 'Amount__c', 'Spent_By__c', -1);
             deltas = mergeDeltas(deltas, d);
-            for (Decimal v : d.values()) totalDelta += v;
         }
 
-        updateTotal('Total_Expenses__c', totalDelta);
         updatePersonFunds('Total_Expenses__c', deltas);
     }
 }
