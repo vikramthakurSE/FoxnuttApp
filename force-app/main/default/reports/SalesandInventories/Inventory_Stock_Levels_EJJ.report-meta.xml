@@ -16,7 +16,7 @@
         <field>Inventory__c.Quantity_Sold__c</field>
     </columns>
     <columns>
-        <aggregateTypes>Sum</aggregateTypes>
+        <aggregateTypes>Average</aggregateTypes>
         <field>Inventory__c.Avg_Cost_Per_Kg__c</field>
     </columns>
     <columns>
@@ -44,7 +44,7 @@
         <value>1</value>
     </params>
     <reportType>CustomEntity$Inventory__c</reportType>
-    <scope>user</scope>
+    <scope>organization</scope>
     <showDetails>true</showDetails>
     <showGrandTotal>true</showGrandTotal>
     <showSubTotals>true</showSubTotals>

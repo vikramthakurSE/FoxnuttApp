@@ -11,19 +11,28 @@
     </columns>
     <columns>
         <aggregateTypes>Sum</aggregateTypes>
-        <field>Sale__c.Total_Revenue__c</field>
+        <field>Sale__c.Effective_Revenue__c</field>
     </columns>
     <columns>
         <aggregateTypes>Sum</aggregateTypes>
-        <field>Sale__c.Total_Profit__c</field>
+        <field>Sale__c.Effective_Profit__c</field>
     </columns>
     <columns>
-        <aggregateTypes>Sum</aggregateTypes>
+        <aggregateTypes>Average</aggregateTypes>
         <field>Sale__c.Profit_Margin__c</field>
     </columns>
     <columns>
         <field>Sale__c.Payment_Status__c</field>
     </columns>
+    <filter>
+        <criteriaItems>
+            <column>Sale__c.Order_Status__c</column>
+            <columnToColumn>false</columnToColumn>
+            <isUnlocked>true</isUnlocked>
+            <operator>equals</operator>
+            <value>Delivered</value>
+        </criteriaItems>
+    </filter>
     <format>Tabular</format>
     <name>Recent Sales — Last 10</name>
     <params>
@@ -31,6 +40,7 @@
         <value>1</value>
     </params>
     <reportType>CustomEntity$Sale__c</reportType>
+    <rowLimit>10</rowLimit>
     <scope>organization</scope>
     <showDetails>true</showDetails>
     <showGrandTotal>true</showGrandTotal>

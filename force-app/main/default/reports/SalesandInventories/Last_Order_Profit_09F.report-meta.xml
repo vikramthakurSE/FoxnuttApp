@@ -12,7 +12,7 @@
         <field>Sale__c.Effective_Profit__c</field>
     </columns>
     <columns>
-        <aggregateTypes>Sum</aggregateTypes>
+        <aggregateTypes>Average</aggregateTypes>
         <field>Sale__c.Profit_Margin__c</field>
     </columns>
     <filter>
@@ -22,6 +22,13 @@
             <isUnlocked>true</isUnlocked>
             <operator>equals</operator>
             <value>LAST_90_DAYS</value>
+        </criteriaItems>
+            <criteriaItems>
+            <column>Sale__c.Order_Status__c</column>
+            <columnToColumn>false</columnToColumn>
+            <isUnlocked>true</isUnlocked>
+            <operator>equals</operator>
+            <value>Delivered</value>
         </criteriaItems>
     </filter>
     <format>Summary</format>
@@ -44,6 +51,6 @@
     <sortOrder>Desc</sortOrder>
     <timeFrameFilter>
         <dateColumn>Sale__c.Sale_Date__c</dateColumn>
-        <interval>INTERVAL_CURRENT</interval>
+        <interval>INTERVAL_CUSTOM</interval>
     </timeFrameFilter>
 </Report>

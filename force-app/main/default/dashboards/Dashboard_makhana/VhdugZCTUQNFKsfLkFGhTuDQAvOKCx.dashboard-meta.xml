@@ -17,7 +17,7 @@
                 <chartSummary>
                     <aggregate>Sum</aggregate>
                     <axisBinding>y</axisBinding>
-                    <column>Business_Summary__c.Available_Funds__c</column>
+                    <column>Person_Fund__c.Available_Funds__c</column>
                 </chartSummary>
                 <componentType>Donut</componentType>
                 <decimalPrecision>-1</decimalPrecision>
@@ -159,7 +159,7 @@
                 <chartSummary>
                     <aggregate>Sum</aggregate>
                     <axisBinding>y</axisBinding>
-                    <column>Sale_Line_Item__c$Line_Profit__c</column>
+                    <column>Sale_Line_Item__c.Line_Profit__c</column>
                 </chartSummary>
                 <componentType>Bar</componentType>
                 <decimalPrecision>-1</decimalPrecision>
@@ -168,7 +168,7 @@
                 <drillToDetailEnabled>false</drillToDetailEnabled>
                 <enableHover>false</enableHover>
                 <expandOthers>false</expandOthers>
-                <groupingColumn>Sale_Line_Item__c$Brand__c</groupingColumn>
+                <groupingColumn>Sale_Line_Item__c.Brand__c</groupingColumn>
                 <groupingSortProperties>
                     <groupingSorts>
                         <groupingLevel>g1</groupingLevel>

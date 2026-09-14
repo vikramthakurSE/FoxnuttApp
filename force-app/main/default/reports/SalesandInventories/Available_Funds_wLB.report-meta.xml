@@ -2,22 +2,26 @@
 <Report xmlns="http://soap.sforce.com/2006/04/metadata">
     <columns>
         <aggregateTypes>Sum</aggregateTypes>
-        <field>Business_Summary__c.Total_Collected__c</field>
+        <field>Person_Fund__c.Total_Collected__c</field>
     </columns>
     <columns>
         <aggregateTypes>Sum</aggregateTypes>
-        <field>Business_Summary__c.Available_Funds__c</field>
+        <field>Person_Fund__c.Available_Funds__c</field>
     </columns>
     <columns>
         <aggregateTypes>Sum</aggregateTypes>
-        <field>Business_Summary__c.Total_Mfr_Paid__c</field>
+        <field>Person_Fund__c.Total_Mfr_Paid__c</field>
     </columns>
     <columns>
         <aggregateTypes>Sum</aggregateTypes>
-        <field>Business_Summary__c.Total_Expenses__c</field>
+        <field>Person_Fund__c.Total_Expenses__c</field>
     </columns>
     <columns>
-        <field>Business_Summary__c.Last_Updated__c</field>
+        <aggregateTypes>Sum</aggregateTypes>
+        <field>Person_Fund__c.Total_Withdrawn__c</field>
+    </columns>
+    <columns>
+        <field>Person_Fund__c.Last_Updated__c</field>
     </columns>
     <format>Summary</format>
     <groupingsDown>
@@ -30,13 +34,13 @@
         <name>co</name>
         <value>1</value>
     </params>
-    <reportType>CustomEntity$Business_Summary__c</reportType>
-    <scope>user</scope>
+    <reportType>CustomEntity$Person_Fund__c</reportType>
+    <scope>organization</scope>
     <showDetails>true</showDetails>
     <showGrandTotal>true</showGrandTotal>
     <showSubTotals>true</showSubTotals>
     <timeFrameFilter>
-        <dateColumn>Business_Summary__c.Last_Updated__c</dateColumn>
+        <dateColumn>Person_Fund__c.Last_Updated__c</dateColumn>
         <interval>INTERVAL_CUSTOM</interval>
     </timeFrameFilter>
 </Report>

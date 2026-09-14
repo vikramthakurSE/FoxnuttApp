@@ -2,21 +2,31 @@
 <Report xmlns="http://soap.sforce.com/2006/04/metadata">
     <columns>
         <aggregateTypes>Sum</aggregateTypes>
-        <field>Sale__c.Total_Revenue__c</field>
+        <field>Sale__c.Effective_Revenue__c</field>
     </columns>
     <columns>
         <aggregateTypes>Sum</aggregateTypes>
-        <field>Sale__c.Total_Profit__c</field>
+        <field>Sale__c.Effective_Profit__c</field>
     </columns>
     <columns>
-        <aggregateTypes>Sum</aggregateTypes>
+        <aggregateTypes>Average</aggregateTypes>
         <field>Sale__c.Profit_Margin__c</field>
     </columns>
     <columns>
         <field>Sale__c.Order_Status__c</field>
     </columns>
+    <filter>
+        <criteriaItems>
+            <column>Sale__c.Order_Status__c</column>
+            <columnToColumn>false</columnToColumn>
+            <isUnlocked>true</isUnlocked>
+            <operator>equals</operator>
+            <value>Delivered</value>
+        </criteriaItems>
+    </filter>
     <format>Summary</format>
     <groupingsDown>
+        <dateGranularity>Month</dateGranularity>
         <field>Sale__c.Sale_Date__c</field>
         <sortOrder>Asc</sortOrder>
     </groupingsDown>
@@ -25,8 +35,8 @@
         <name>co</name>
         <value>1</value>
     </params>
-    <reportType>CustomEntityCustomEntity$Sale__c$Sale_Line_Item__c</reportType>
-    <scope>user</scope>
+    <reportType>CustomEntity$Sale__c</reportType>
+    <scope>organization</scope>
     <showDetails>true</showDetails>
     <showGrandTotal>true</showGrandTotal>
     <showSubTotals>true</showSubTotals>
