@@ -829,6 +829,78 @@ public without sharing class WebStoreService {
         };
     }
 
+    // ── Saved delivery addresses ─────────────────────────────────────────
+    public static final Integer MAX_SAVED_ADDRESSES = 5;
+
+    /**
+     * Addresses a client has already used, most recent first: each distinct
+     * delivery address on their orders, then the account's own shipping and
+     * billing address when not already listed. Checkout prefills the form
+     * with the first and offers the rest as a pick-list, so returning
+     * clients never retype an address. A new address entered at checkout is
+     * stored on that order's Delivery_Address__c and appears here next time.
+     */
+    public static List<Map<String, Object>> getSavedAddresses(String code) {
+        List<Map<String, Object>> out = new List<Map<String, Object>>();
+        Account a = findClientByCode(code);
+        if (a == null) return out;
+        Set<String> seen = new Set<String>();
+
+        // Long text areas cannot be filtered in SOQL, so blanks are skipped here.
+        for (Sale__c s : [
+            SELECT Delivery_Address__c, Sale_Date__c
+            FROM Sale__c
+            WHERE Client__c = :a.Id
+            AND Order_Status__c != 'Cancelled'
+            ORDER BY Sale_Date__c DESC, CreatedDate DESC
+            LIMIT 200
+        ]) {
+            addSavedAddress(out, seen, s.Delivery_Address__c, 'order',
+                s.Sale_Date__c == null ? null : String.valueOf(s.Sale_Date__c));
+            if (out.size() >= MAX_SAVED_ADDRESSES) return out;
+        }
+
+        Account full = [
+            SELECT ShippingStreet, ShippingCity, ShippingState, ShippingPostalCode,
+                   BillingStreet, BillingCity, BillingState, BillingPostalCode
+            FROM Account WHERE Id = :a.Id
+        ];
+        addSavedAddress(out, seen, joinAddress(new List<String>{
+            full.ShippingStreet, full.ShippingCity,
+            full.ShippingState, full.ShippingPostalCode }), 'account', null);
+        if (out.size() < MAX_SAVED_ADDRESSES) {
+            addSavedAddress(out, seen, joinAddress(new List<String>{
+                full.BillingStreet, full.BillingCity,
+                full.BillingState, full.BillingPostalCode }), 'account', null);
+        }
+        return out;
+    }
+
+    private static void addSavedAddress(
+        List<Map<String, Object>> out, Set<String> seen,
+        String address, String source, String lastUsed
+    ) {
+        if (String.isBlank(address)) return;
+        String clean = address.trim();
+        // Same place typed with different case, spacing or trailing commas.
+        String key = clean.toLowerCase().replaceAll('[\\s,.]+', ' ').trim();
+        if (String.isBlank(key) || seen.contains(key)) return;
+        seen.add(key);
+        out.add(new Map<String, Object>{
+            'address'  => clean,
+            'source'   => source,
+            'lastUsed' => lastUsed
+        });
+    }
+
+    private static String joinAddress(List<String> parts) {
+        List<String> kept = new List<String>();
+        for (String p : parts) {
+            if (String.isNotBlank(p)) kept.add(p.trim());
+        }
+        return kept.isEmpty() ? null : String.join(kept, ', ');
+    }
+
     // ── Overdue payments ─────────────────────────────────────────────────
     /**
      * Delivered orders with money still owed that are older than

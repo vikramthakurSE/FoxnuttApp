@@ -7,6 +7,7 @@
  *   GET  /services/apexrest/store/v1/orders?phone=... → order history for a phone
  *   GET  /services/apexrest/store/v1/payment-due?code=… → old unpaid orders blocking checkout
  *   GET  /services/apexrest/store/v1/order-payment?ref=… → payment state of one web order
+ *   GET  /services/apexrest/store/v1/addresses?code=…    → a client's saved delivery addresses
  *   GET  /services/apexrest/store/v1/receipt?ref=…       → PDF receipt for one web order
  *   GET  /services/apexrest/store/v1/receipt?ref=…       → PDF receipt for one web order
  *   POST /services/apexrest/store/v1/orders           → place an order
@@ -85,6 +86,12 @@ global with sharing class WebStoreAPI {
                     pay.put('found', true);
                     respond(res, 200, pay);
                 }
+            } else if (path.contains('/addresses')) {
+                // Saved delivery addresses for checkout's pick-list.
+                respond(res, 200, new Map<String, Object>{
+                    'addresses' => WebStoreService.getSavedAddresses(
+                        req.params.get('code'))
+                });
             } else if (path.contains('/payment-due')) {
                 // What a logged-in client must pay before ordering again.
                 List<WebStoreService.OverdueSale> due =
