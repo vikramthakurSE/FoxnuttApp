@@ -159,7 +159,11 @@
 .li-builder { margin-bottom:16px; }
 .li-builder-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
 .li-builder-title { font-size:13px; font-weight:700; color:#111; }
-.li-add-btn { background:#f5a623; color:#fff; border:none; border-radius:20px; padding:6px 16px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; }
+.li-add-btn { display:block; width:100%; background:#fff; color:#e8920f; border:1.5px dashed #f5a623; border-radius:12px; padding:12px 16px; font-size:14px; font-weight:700; cursor:pointer; font-family:inherit; -webkit-tap-highlight-color:transparent; }
+.li-add-btn:active { transform:scale(.98); background:#fff8ec; }
+.repeat-btn { background:#f5a623; color:#fff; border:none; border-radius:20px; padding:6px 14px; font-size:12px; font-weight:700; cursor:pointer; font-family:inherit; -webkit-tap-highlight-color:transparent; }
+.repeat-btn:active { transform:scale(.97); }
+.repeat-hint { font-size:11px; color:#9ca3af; margin:-6px 0 10px; }
 .li-builder-item { background:#f9fafb; border:1.5px solid #e5e7eb; border-radius:12px; padding:12px; margin-bottom:10px; }
 .lib-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
 .lib-num { font-size:11px; font-weight:700; color:#9ca3af; background:#e5e7eb; padding:2px 8px; border-radius:10px; }
@@ -169,7 +173,6 @@
 .lib-total { font-size:16px; font-weight:800; color:#111; }
 .lib-warn { background:#fef2f2; color:#dc2626; font-size:11px; font-weight:600; padding:5px 10px; border-radius:7px; margin-top:6px; }
 .lib-hint { background:#f0fdf4; color:#16a34a; font-size:11px; font-weight:600; padding:5px 10px; border-radius:7px; margin-top:6px; }
-.li-empty { text-align:center; color:#9ca3af; font-size:13px; padding:20px 0; }
 .grand-total-bar { background:#0f172a; border-radius:12px; padding:14px 18px; display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
 .gt-label { font-size:13px; color:#94a3b8; font-weight:500; }
 .gt-amount { font-size:22px; font-weight:900; color:#f5a623; }

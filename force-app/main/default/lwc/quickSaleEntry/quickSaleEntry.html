@@ -131,10 +131,6 @@
                         <div class="section-title">
                             🏷️ Line Items
                         </div>
-                        <button class="add-btn"
-                            onclick={addLineItem}>
-                            + Add Brand
-                        </button>
                     </div>
 
                     <template if:true={hasLineItems}>
@@ -268,11 +264,10 @@
                         </template>
                     </template>
 
-                    <template if:false={hasLineItems}>
-                        <div class="empty-state">
-                            Tap "+ Add Brand" to add products
-                        </div>
-                    </template>
+                    <button class="add-btn"
+                        onclick={addLineItem}>
+                        + Add Brand
+                    </button>
                 </div>
 
                 <!-- ORDER SUMMARY -->

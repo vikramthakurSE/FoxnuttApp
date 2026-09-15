@@ -586,20 +586,77 @@ export default class AccountClientView extends NavigationMixin(LightningElement)
     onStatus(e)    { this.orderStatus  = e.target.value; }
     onManager(e)   { this.saleManager  = e.target.value; }
 
+    get lastOrder() {
+        return this.sales.find(s => !s.isCancelled && s.hasLineItems);
+    }
+    get hasLastOrder() { return !!this.lastOrder; }
+
+    repeatLastOrder() {
+        const last = this.lastOrder;
+        if (!last) return;
+        this.lineItemCounter = 0;
+        this.lineItems = last.lineItems.map(src => {
+            this.lineItemCounter++;
+            return this._decorateLineItem({
+                key: 'li_' + this.lineItemCounter,
+                brand:      src.Brand__c || '',
+                packetType: src.Packet_Type__c || '',
+                quantity:   src.Quantity__c || 0,
+                rate:       src.Rate_Per_Kg__c || 0,
+                gstApplied: !!src.GST_Applied__c
+            });
+        });
+        this._renumber(this.lineItems);
+        if (last.Regional_Manager__c) this.saleManager = last.Regional_Manager__c;
+        this.dispatchEvent(new ShowToastEvent({
+            title: 'Last order copied',
+            message: 'Review quantities and rates before saving.',
+            variant: 'info'
+        }));
+    }
+
     addLineItem() {
         this.lineItemCounter++;
-        this.lineItems = [...this.lineItems, {
-            key: 'li_' + this.lineItemCounter, displayIndex: this.lineItemCounter,
-            brand: '', packetType: '', quantity: 0, rate: 0, gstApplied: false,
-            lineTotal: '0.00', stockWarning: '', stockHint: ''
-        }];
+        const items = [...this.lineItems, this._decorateLineItem({
+            key: 'li_' + this.lineItemCounter,
+            brand: '', packetType: '', quantity: 0, rate: 0, gstApplied: false
+        })];
+        this._renumber(items);
+        this.lineItems = items;
+    }
+
+    _renumber(items) {
+        items.forEach((it, i) => { it.displayIndex = i + 1; });
+    }
+
+    _decorateLineItem(item) {
+        const out = { ...item, stockWarning: '', stockHint: '', hasBlocked: false, blockedMsg: '' };
+        if (out.brand && out.packetType) {
+            const inv     = this.inventory.find(i => i.Brand__c === out.brand && i.Packet_Type__c === out.packetType);
+            const blocked = inv ? (inv.blocked   || 0) : 0;
+            const avail   = inv ? (inv.available || 0) : 0;
+            out.stockHint  = avail;
+            out.blockedQty = blocked;
+            out.hasBlocked = blocked > 0;
+            out.blockedMsg = blocked > 0
+                ? blocked + ' KG blocked (active orders). Only ' + avail + ' KG available — confirm order for max ' + avail + ' KG.'
+                : '';
+            out.stockWarning = out.quantity > avail ? 'Only ' + avail + ' KG available!' : '';
+        }
+        const base = out.quantity * out.rate;
+        out.lineTotal      = (base + (out.gstApplied ? base * 0.05 : 0)).toFixed(2);
+        out.quantityInput  = out.quantity || '';
+        out.rateInput      = out.rate || '';
+        out.brandOpts      = this.brandOptions.map(v => ({ value: v, selected: v === out.brand }));
+        out.packetTypeOpts = this.packetTypeOptions.map(v => ({ value: v, selected: v === out.packetType }));
+        return out;
     }
 
     removeLineItem(e) {
         const idx = parseInt(e.target.dataset.index);
         const items = [...this.lineItems];
         items.splice(idx, 1);
-        items.forEach((it, i) => { it.displayIndex = i + 1; });
+        this._renumber(items);
         this.lineItems = items;
     }
 
@@ -615,22 +672,7 @@ export default class AccountClientView extends NavigationMixin(LightningElement)
         else if (field === 'rate')       item.rate       = parseFloat(e.target.value) || 0;
         else if (field === 'gst')        item.gstApplied = e.target.checked;
 
-        if (item.brand && item.packetType) {
-            const inv      = this.inventory.find(i => i.Brand__c === item.brand && i.Packet_Type__c === item.packetType);
-            const remaining = inv ? (inv.Remaining_Quantity__c || 0) : 0;
-            const blocked   = inv ? (inv.blocked   || 0) : 0;
-            const avail     = inv ? (inv.available  || 0) : 0;
-            item.stockHint    = avail;
-            item.blockedQty   = blocked;
-            item.hasBlocked   = blocked > 0;
-            item.blockedMsg   = blocked > 0
-                ? blocked + ' KG blocked (active orders). Only ' + avail + ' KG available — confirm order for max ' + avail + ' KG.'
-                : '';
-            item.stockWarning = item.quantity > avail ? 'Only ' + avail + ' KG available!' : '';
-        }
-        const base = item.quantity * item.rate;
-        item.lineTotal = (base + (item.gstApplied ? base * 0.05 : 0)).toFixed(2);
-        items[idx] = item;
+        items[idx] = this._decorateLineItem(item);
         this.lineItems = items;
     }
 
