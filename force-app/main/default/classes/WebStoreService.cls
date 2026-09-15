@@ -829,6 +829,43 @@ public without sharing class WebStoreService {
         };
     }
 
+    /**
+     * Balance of one of a LOGGED-IN client's own orders, by sale id — used
+     * to poll while a custom (often partial) payment against that specific
+     * order is in flight from the orders page.
+     *
+     * Ownership is checked by code, not by trusting the sale id, same as
+     * ownedSale — but unlike ownedSale this does not gate on
+     * CUSTOMER_EDITABLE: a Delivered order is exactly the common case that
+     * still owes money and must stay payable after delivery.
+     *
+     * Null on a bad code or a sale that is not this client's own, so the
+     * website cannot use this to probe whether some other sale id exists.
+     */
+    public static Map<String, Object> getOrderBalance(String businessCode, Id saleId) {
+        Account a = findClientByCode(businessCode);
+        if (a == null || saleId == null) return null;
+
+        List<Sale__c> rows = [
+            SELECT Id, Name, Order_Status__c, Total_Revenue__c,
+                   Total_Collected__c, Balance_Due__c
+            FROM Sale__c
+            WHERE Id = :saleId AND Client__c = :a.Id
+            LIMIT 1
+        ];
+        if (rows.isEmpty()) return null;
+
+        Sale__c s = rows[0];
+        return new Map<String, Object>{
+            'saleId'     => s.Id,
+            'saleName'   => s.Name,
+            'status'     => s.Order_Status__c,
+            'total'      => s.Total_Revenue__c,
+            'collected'  => s.Total_Collected__c,
+            'balanceDue' => s.Balance_Due__c == null ? 0 : s.Balance_Due__c
+        };
+    }
+
     // ── Saved delivery addresses ─────────────────────────────────────────
     public static final Integer MAX_SAVED_ADDRESSES = 5;
 
