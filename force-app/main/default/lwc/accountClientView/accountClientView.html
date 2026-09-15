@@ -161,8 +161,15 @@
                 <div class="li-builder">
                     <div class="li-builder-head">
                         <div class="li-builder-title">Products</div>
-                        <button class="li-add-btn" onclick={addLineItem}>+ Add</button>
+                        <template if:true={hasLastOrder}>
+                            <button class="repeat-btn" onclick={repeatLastOrder}>
+                                &#8635; Repeat Last Order
+                            </button>
+                        </template>
                     </div>
+                    <template if:true={hasLastOrder}>
+                        <div class="repeat-hint">Last order {lastOrder.Name} &middot; {lastOrder.formattedDate}</div>
+                    </template>
                     <template for:each={lineItems} for:item="li" for:index="idx">
                         <div key={li.key} class="li-builder-item">
                             <div class="lib-top">
@@ -174,8 +181,8 @@
                                     <label class="form-label">Brand *</label>
                                     <select class="form-input" data-index={idx} data-field="brand" onchange={onLineItem}>
                                         <option value="">-- Brand --</option>
-                                        <template for:each={brandOptions} for:item="b">
-                                            <option key={b} value={b}>{b}</option>
+                                        <template for:each={li.brandOpts} for:item="b">
+                                            <option key={b.value} value={b.value} selected={b.selected}>{b.value}</option>
                                         </template>
                                     </select>
                                 </div>
@@ -183,8 +190,8 @@
                                     <label class="form-label">Type *</label>
                                     <select class="form-input" data-index={idx} data-field="packetType" onchange={onLineItem}>
                                         <option value="">-- Type --</option>
-                                        <template for:each={packetTypeOptions} for:item="pt">
-                                            <option key={pt} value={pt}>{pt}</option>
+                                        <template for:each={li.packetTypeOpts} for:item="pt">
+                                            <option key={pt.value} value={pt.value} selected={pt.selected}>{pt.value}</option>
                                         </template>
                                     </select>
                                 </div>
@@ -193,17 +200,17 @@
                                 <div class="form-group">
                                     <label class="form-label">Qty (KG) *</label>
                                     <input type="number" class="form-input" placeholder="0.00"
-                                        min="0" step="0.5" data-index={idx} data-field="quantity" onchange={onLineItem}>
+                                        min="0" step="0.5" value={li.quantityInput} data-index={idx} data-field="quantity" onchange={onLineItem}>
                                 </div>
                                 <div class="form-group">
                                     <label class="form-label">Rate (&#8377;/kg) *</label>
                                     <input type="number" class="form-input" placeholder="0.00"
-                                        min="0" data-index={idx} data-field="rate" onchange={onLineItem}>
+                                        min="0" value={li.rateInput} data-index={idx} data-field="rate" onchange={onLineItem}>
                                 </div>
                             </div>
                             <div class="lib-footer">
                                 <label class="gst-label">
-                                    <input type="checkbox" data-index={idx} data-field="gst" onchange={onLineItem}>
+                                    <input type="checkbox" checked={li.gstApplied} data-index={idx} data-field="gst" onchange={onLineItem}>
                                     5% GST
                                 </label>
                                 <div class="lib-total">&#8377;{li.lineTotal}</div>
@@ -221,9 +228,7 @@
                             </template>
                         </div>
                     </template>
-                    <template if:false={hasLineItems}>
-                        <div class="li-empty">Tap + Add to add products</div>
-                    </template>
+                    <button class="li-add-btn" onclick={addLineItem}>+ Add Brand</button>
                 </div>
 
                 <template if:true={hasLineItems}>

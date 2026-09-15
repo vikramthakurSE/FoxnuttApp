@@ -142,14 +142,22 @@
 
 /* ADD BUTTON */
 .add-btn {
-    background: #f5a623;
-    color: #fff;
-    border: none;
-    border-radius: 20px;
-    padding: 7px 16px;
-    font-size: 13px;
+    display: block;
+    width: 100%;
+    background: #fff;
+    color: #e8920f;
+    border: 1.5px dashed #f5a623;
+    border-radius: 12px;
+    padding: 12px 16px;
+    font-size: 14px;
     font-weight: 700;
     cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.add-btn:active {
+    transform: scale(.98);
+    background: #fff8ec;
 }
 
 /* STOCK GRID */
@@ -304,13 +312,6 @@
     padding: 6px 10px;
     border-radius: 7px;
     margin-top: 8px;
-}
-
-.empty-state {
-    text-align: center;
-    color: #9ca3af;
-    font-size: 13px;
-    padding: 24px 0;
 }
 
 /* ORDER SUMMARY */
