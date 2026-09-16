@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Brand_Name__c</fullName>
+    <description>First word of the product brand, e.g. Holiday covers Holiday_250g and Holiday loose.</description>
+    <externalId>false</externalId>
+    <fieldManageability>SubscriberControlled</fieldManageability>
+    <inlineHelpText>First word of the product brand, e.g. Holiday covers Holiday_250g and Holiday loose.</inlineHelpText>
+    <label>Brand Name</label>
+    <length>40</length>
+    <unique>false</unique>
+    <required>false</required>
+    <type>Text</type>
+</CustomField>

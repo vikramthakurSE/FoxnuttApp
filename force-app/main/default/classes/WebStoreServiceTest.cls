@@ -31,6 +31,9 @@ private class WebStoreServiceTest {
         input.name    = 'Test Buyer';
         input.businessName = 'Test Kirana Store';
         input.address = '12 MG Road, Bengaluru';
+        input.pincode = '560001';
+        input.districts = new List<String>{ 'BENGALURU URBAN' };
+        input.state   = 'KARNATAKA';
         input.note    = 'Please deliver in the morning';
         input.orderRef = ref;
         WebStoreService.OrderItemInput item =
@@ -79,7 +82,7 @@ private class WebStoreServiceTest {
 
         System.assertEquals(true, res.newCustomer);
         System.assertEquals('Pending Approval', res.status);
-        System.assertEquals(1200.00, res.total); // 1 KG @ 1200
+        System.assertEquals(1260.00, res.total); // 1 KG @ 1200 + 5% GST
 
         Account acc = [SELECT Name, Phone_Digits__c, AccountSource,
                               Contact_Person__c
@@ -338,7 +341,7 @@ private class WebStoreServiceTest {
         Map<String, Object> pay = WebStoreService.getOrderPayment('web-ref-online');
         System.assertEquals(res.saleName, pay.get('saleName'));
         System.assertEquals(false, pay.get('paid'));
-        System.assertEquals(600, pay.get('balanceDue'));
+        System.assertEquals(630, pay.get('balanceDue')); // 0.5 KG @ 1200 + 5% GST
         System.assertEquals(null, WebStoreService.getOrderPayment('nope'));
 
         RestContext.request  = new RestRequest();
@@ -457,5 +460,165 @@ private class WebStoreServiceTest {
         RestContext.request.requestBody = Blob.valueOf('{"items":[]}');
         WebStoreAPI.doPost();
         System.assertEquals(400, RestContext.response.statusCode);
+    }
+
+    // ── Delivery rules by PIN code ───────────────────────────────────────
+
+    /** Fixed numbers, so these tests do not follow edits to the live settings. */
+    private static void useLaunchDeliverySettings() {
+        DeliveryRules.Settings s = new DeliveryRules.Settings();
+        s.localDistricts = new Set<String>{ 'BENGALURU URBAN', 'BENGALURU RURAL' };
+        s.homeState    = 'KARNATAKA';
+        s.defaultMinKg = 10;
+        s.chargePerKg  = 5;
+        s.maxCharge    = 90;
+        s.brandMinKg   = new Map<String, Decimal>{ 'holiday' => 8 };
+        DeliveryRules.cached = s;
+    }
+
+    private static WebStoreService.OrderInput outsideInput(
+        String ref, Integer packets, String state, String district
+    ) {
+        WebStoreService.OrderInput input = orderInput('9876512345', ref, packets);
+        input.pincode   = state == 'KARNATAKA' ? '570001' : '600001';
+        input.districts = new List<String>{ district };
+        input.state     = state;
+        return input;
+    }
+
+    @isTest
+    static void testMissingPincodeRejected() {
+        seedData();
+        WebStoreService.OrderInput input = orderInput('9876543210', 'web-ref-nopin', 1);
+        input.pincode = '5600';
+        Boolean refused = false;
+        try {
+            WebStoreService.placeOrder(input);
+        } catch (WebStoreService.WebStoreException e) {
+            refused = e.getMessage().contains('PIN code');
+        }
+        System.assert(refused, 'An order with a malformed PIN code must be refused');
+
+        // An older website build sends no PIN code: old pricing, no rules.
+        WebStoreService.OrderInput legacy = orderInput('9876543210', 'web-ref-legacy', 1);
+        legacy.pincode = null;
+        legacy.districts = null;
+        legacy.state = null;
+        WebStoreService.OrderResult res = WebStoreService.placeOrder(legacy);
+        System.assertEquals(300, res.total);
+        Sale__c s = [SELECT Delivery_Zone__c, Delivery_Charge__c FROM Sale__c WHERE Id = :res.saleId];
+        System.assertEquals(null, s.Delivery_Zone__c);
+        System.assertEquals(0, s.Delivery_Charge__c);
+    }
+
+    @isTest
+    static void testBangaloreAcceptsSmallOrderWithoutCharge() {
+        seedData();
+        useLaunchDeliverySettings();
+        WebStoreService.OrderInput input = orderInput('9876543210', 'web-ref-blr', 1);
+        input.districts = new List<String>{ 'Bengaluru Rural' };
+        WebStoreService.OrderResult res = WebStoreService.placeOrder(input);
+        Sale__c s = [SELECT Delivery_Zone__c, Delivery_Charge__c, Delivery_Pincode__c
+                     FROM Sale__c WHERE Id = :res.saleId];
+        System.assertEquals('Local', s.Delivery_Zone__c);
+        System.assertEquals(0, s.Delivery_Charge__c);
+        System.assertEquals('560001', s.Delivery_Pincode__c);
+    }
+
+    @isTest
+    static void testOutsideBangaloreBelowMinimumRejected() {
+        seedData();
+        useLaunchDeliverySettings();
+        Boolean refused = false;
+        try {
+            // 7 KG of Holiday, minimum 8
+            WebStoreService.placeOrder(outsideInput('web-ref-mys', 28, 'KARNATAKA', 'MYSURU'));
+        } catch (WebStoreService.WebStoreException e) {
+            refused = e.getMessage().contains('Holiday needs at least 8 KG (you have 7 KG)');
+        }
+        System.assert(refused, 'Holiday under 8 KG outside Bangalore must be refused');
+        System.assertEquals(0, [SELECT COUNT() FROM Sale__c]);
+    }
+
+    @isTest
+    static void testHomeStateMeetsMinimumWithoutCharge() {
+        seedData();
+        useLaunchDeliverySettings();
+        WebStoreService.OrderResult res = WebStoreService.placeOrder(
+            outsideInput('web-ref-mys-ok', 32, 'KARNATAKA', 'MYSURU'));   // 8 KG
+        Sale__c s = [SELECT Delivery_Zone__c, Delivery_Charge__c, Order_Total__c
+                     FROM Sale__c WHERE Id = :res.saleId];
+        System.assertEquals('Home State', s.Delivery_Zone__c);
+        System.assertEquals(0, s.Delivery_Charge__c);
+        System.assertEquals(10080, s.Order_Total__c);   // 8 KG @ 1200 + 5% GST
+    }
+
+    @isTest
+    static void testOtherStateChargesPerKgWithCap() {
+        seedData();
+        useLaunchDeliverySettings();
+        WebStoreService.OrderResult small = WebStoreService.placeOrder(
+            outsideInput('web-ref-chn', 48, 'TAMIL NADU', 'CHENNAI'));    // 12 KG
+        System.assertEquals(60, small.deliveryCharge);
+        System.assertEquals(15120 + 60, small.total);
+
+        DeliveryRules.Quote capped = DeliveryRules.quote(
+            DeliveryRules.ZONE_OTHER_STATE,
+            new Map<String, Decimal>{ 'Holiday_250g' => 12, 'Gopala 250g' => 10 });
+        System.assertEquals(90, capped.charge);   // 22 KG × 5 = 110, capped
+        System.assert(capped.shortfalls.isEmpty());
+
+        Sale__c s = [SELECT Balance_Due__c, Payment_Status__c FROM Sale__c WHERE Id = :small.saleId];
+        System.assertEquals(15180, s.Balance_Due__c);
+        System.assertEquals('Unpaid', s.Payment_Status__c);
+    }
+
+    @isTest
+    static void testEachBrandNeedsItsOwnMinimum() {
+        useLaunchDeliverySettings();
+        DeliveryRules.Quote q = DeliveryRules.quote(
+            DeliveryRules.ZONE_HOME_STATE,
+            new Map<String, Decimal>{
+                'Holiday_250g'  => 5,
+                'Holiday loose' => 3,     // Holiday 8 KG together — fine
+                'Gopala 250g'   => 9.5    // under 10
+            });
+        System.assertEquals(1, q.shortfalls.size());
+        System.assertEquals('Gopala', q.shortfalls[0].brand);
+        System.assertEquals(17.5, q.totalKg);
+        System.assertEquals(0, q.charge);
+        System.assertEquals('Local', DeliveryRules.zoneFor(
+            new List<String>{ 'RAMANAGARA', 'bengaluru  urban' }, 'KARNATAKA'));
+        System.assertEquals('Other State', DeliveryRules.zoneFor(null, 'KERALA'));
+        System.assertNotEquals(null, DeliveryRules.forWeb().get('chargePerKg'));
+    }
+
+    @isTest
+    static void testModifyOrderKeepsMinimumAndRecalculatesCharge() {
+        seedData();
+        useLaunchDeliverySettings();
+        WebStoreService.OrderResult res = WebStoreService.placeOrder(
+            outsideInput('web-ref-mod', 48, 'TAMIL NADU', 'CHENNAI'));    // 12 KG
+        String code = [SELECT Unique_Business_Code__c FROM Account
+                       WHERE Id = :res.accountId].Unique_Business_Code__c;
+        Sale_Line_Item__c li = [SELECT Id FROM Sale_Line_Item__c WHERE Sale__c = :res.saleId];
+
+        Test.startTest();
+        Boolean refused = false;
+        try {
+            WebStoreService.modifyOrder(code, res.saleId, new Map<Id, Integer>{ li.Id => 20 });
+        } catch (WebStoreService.WebStoreException e) {
+            refused = e.getMessage().contains('Holiday needs at least 8 KG');
+        }
+        System.assert(refused, 'Dropping under the minimum must be refused');
+
+        WebStoreService.OrderEditResult r = WebStoreService.modifyOrder(
+            code, res.saleId, new Map<Id, Integer>{ li.Id => 40 });        // 10 KG
+        Test.stopTest();
+
+        Sale__c s = [SELECT Delivery_Charge__c, Order_Total__c FROM Sale__c WHERE Id = :res.saleId];
+        System.assertEquals(50, s.Delivery_Charge__c);
+        System.assertEquals(12600 + 50, r.total);
+        System.assertEquals(12650, s.Order_Total__c);
     }
 }

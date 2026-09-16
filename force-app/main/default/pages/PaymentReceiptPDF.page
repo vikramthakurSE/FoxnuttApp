@@ -5,44 +5,44 @@
 <head>
 <style type="text/css">
   @page { size: A4; margin: 0; }
-  body { margin:0; padding:0; font-family: Helvetica, Arial, sans-serif; color:#2e1f14; font-size:11px; }
+  body { margin:0; padding:0; font-family: Helvetica, Arial, sans-serif; color:#1b2a21; font-size:11px; }
   table { border-collapse: collapse; width:100%; }
-  .band { background-color:#9e3115; padding:22px 32px; }
-  .band .brand { color:#faf3e6; font-size:24px; font-weight:bold; }
-  .band .brand .accent { color:#e9ddf7; }
-  .band .doc { color:#f3e8d2; font-size:12px; margin-top:2px; }
+  .band { background-color:#154d31; padding:22px 32px; }
+  .band .brand { color:#f6f7f2; font-size:24px; font-weight:bold; }
+  .band .brand .accent { color:#e8cf96; }
+  .band .doc { color:#d5e2d8; font-size:12px; margin-top:2px; }
   .band .saleNo { color:#ffffff; font-size:18px; font-weight:bold; text-align:right; }
-  .band .saleDate { color:#f3e8d2; font-size:11px; text-align:right; }
+  .band .saleDate { color:#d5e2d8; font-size:11px; text-align:right; }
   .goldbar { background-color:#b8862f; height:5px; }
   .content { padding: 22px 32px; }
   .badge { display:inline; padding:5px 14px; font-size:11px; font-weight:bold; color:#ffffff; }
-  .badge-paid { background-color:#5c7a1e; }
+  .badge-paid { background-color:#1f6b45; }
   .badge-partial { background-color:#b8862f; }
-  .badge-unpaid { background-color:#c2401f; }
+  .badge-unpaid { background-color:#b42318; }
   .infoTable td { vertical-align:top; padding:0; }
-  .card { border:1px solid #e7d9bd; background-color:#fffdf7; padding:12px 14px; }
-  .cardTitle { color:#9e3115; font-size:10px; font-weight:bold; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px; }
-  .cardLine { font-size:11.5px; color:#2e1f14; margin:2px 0; }
-  .cardLabel { color:#6b5744; font-size:10px; }
-  .sectionTitle { color:#9e3115; font-size:12px; font-weight:bold; text-transform:uppercase; letter-spacing:0.04em; margin:20px 0 8px 0; }
-  .items th { background-color:#2e1f14; color:#faf3e6; font-size:10px; text-transform:uppercase; padding:8px 10px; text-align:left; }
+  .card { border:1px solid #dde3d6; background-color:#ffffff; padding:12px 14px; }
+  .cardTitle { color:#1f6b45; font-size:10px; font-weight:bold; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px; }
+  .cardLine { font-size:11.5px; color:#1b2a21; margin:2px 0; }
+  .cardLabel { color:#56665b; font-size:10px; }
+  .sectionTitle { color:#1f6b45; font-size:12px; font-weight:bold; text-transform:uppercase; letter-spacing:0.04em; margin:20px 0 8px 0; }
+  .items th { background-color:#1b2a21; color:#f6f7f2; font-size:10px; text-transform:uppercase; padding:8px 10px; text-align:left; }
   .items th.num, .items td.num { text-align:right; }
-  .items td { padding:8px 10px; font-size:11px; border-bottom:1px solid #e7d9bd; }
-  .items tr.alt td { background-color:#faf3e6; }
+  .items td { padding:8px 10px; font-size:11px; border-bottom:1px solid #dde3d6; }
+  .items tr.alt td { background-color:#f6f7f2; }
   .totals { margin-top:14px; }
   .totals table { width:260px; margin-left:auto; }
   .totals td { padding:5px 4px; font-size:11.5px; }
-  .totals .label { color:#6b5744; }
+  .totals .label { color:#56665b; }
   .totals .value { text-align:right; font-weight:bold; }
-  .totals .grand td { border-top:2px solid #9e3115; padding-top:8px; font-size:14px; }
-  .totals .grand .label { color:#2e1f14; }
-  .balanceOk { color:#5c7a1e; }
-  .balanceDue { color:#c2401f; }
-  .thanks { margin-top:26px; padding:14px 16px; background-color:#f3e8d2; border-left:4px solid #b8862f; }
-  .thanks .h { font-weight:bold; color:#2e1f14; font-size:12px; }
-  .thanks .p { color:#6b5744; font-size:10.5px; margin-top:3px; }
-  .footer { margin-top:24px; text-align:center; color:#a89478; font-size:9px; }
-  .notFound { padding:60px 32px; text-align:center; color:#6b5744; font-size:13px; }
+  .totals .grand td { border-top:2px solid #1f6b45; padding-top:8px; font-size:14px; }
+  .totals .grand .label { color:#1b2a21; }
+  .balanceOk { color:#1f6b45; }
+  .balanceDue { color:#b42318; }
+  .thanks { margin-top:26px; padding:14px 16px; background-color:#e9eee2; border-left:4px solid #b8862f; }
+  .thanks .h { font-weight:bold; color:#1b2a21; font-size:12px; }
+  .thanks .p { color:#56665b; font-size:10.5px; margin-top:3px; }
+  .footer { margin-top:24px; text-align:center; color:#8a978d; font-size:9px; }
+  .notFound { padding:60px 32px; text-align:center; color:#56665b; font-size:13px; }
 </style>
 </head>
 <body>
@@ -131,9 +131,19 @@
 
     <div class="totals">
       <table>
+        <apex:outputPanel layout="none" rendered="{!sale.Delivery_Charge__c > 0}">
+          <tr>
+            <td class="label">Products (incl. GST)</td>
+            <td class="value"><apex:outputText value="₹{0,number,##,##0.00}"><apex:param value="{!sale.Total_Revenue__c}"/></apex:outputText></td>
+          </tr>
+          <tr>
+            <td class="label">Delivery charge</td>
+            <td class="value"><apex:outputText value="₹{0,number,##,##0.00}"><apex:param value="{!sale.Delivery_Charge__c}"/></apex:outputText></td>
+          </tr>
+        </apex:outputPanel>
         <tr>
           <td class="label">Order total</td>
-          <td class="value"><apex:outputText value="₹{0,number,##,##0.00}"><apex:param value="{!sale.Total_Revenue__c}"/></apex:outputText></td>
+          <td class="value"><apex:outputText value="₹{0,number,##,##0.00}"><apex:param value="{!sale.Order_Total__c}"/></apex:outputText></td>
         </tr>
         <apex:outputPanel layout="none" rendered="{!NOT(ISNULL(payment))}">
           <tr>

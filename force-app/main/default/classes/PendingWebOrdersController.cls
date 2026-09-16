@@ -24,7 +24,7 @@ public with sharing class PendingWebOrdersController {
     @AuraEnabled(cacheable=true)
     public static List<PendingOrder> getPendingOrders() {
         List<Sale__c> sales = [
-            SELECT Id, Name, Sale_Date__c, Total_Revenue__c,
+            SELECT Id, Name, Sale_Date__c, Order_Total__c,
                    Delivery_Address__c, CreatedDate,
                    Client__c, Client__r.Name, Client__r.Phone,
                    Client__r.Unique_Business_Code__c,
@@ -63,7 +63,7 @@ public with sharing class PendingWebOrdersController {
             p.clientPhone         = s.Client__r?.Phone;
             p.businessCode        = s.Client__r?.Unique_Business_Code__c;
             p.deliveryAddress     = s.Delivery_Address__c;
-            p.total               = s.Total_Revenue__c;
+            p.total               = s.Order_Total__c;
             // Account made within a minute of the sale means the website
             // created it for this order — worth flagging for a closer look.
             p.isNewCustomer = s.Client__r != null

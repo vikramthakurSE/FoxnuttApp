@@ -3,7 +3,7 @@
  * Consumed server-to-server by the Next.js backend via a Connected App
  * (OAuth 2.0 Client Credentials flow) — never called from the browser.
  *
- *   GET  /services/apexrest/store/v1/catalog          → product catalog + availability
+ *   GET  /services/apexrest/store/v1/catalog          → product catalog + availability + delivery rules
  *   GET  /services/apexrest/store/v1/orders?phone=... → order history for a phone
  *   GET  /services/apexrest/store/v1/payment-due?code=… → old unpaid orders blocking checkout
  *   GET  /services/apexrest/store/v1/order-payment?ref=… → payment state of one web order
@@ -25,7 +25,8 @@ global with sharing class WebStoreAPI {
             String path = req.requestURI.toLowerCase();
             if (path.endsWith('/catalog')) {
                 respond(res, 200, new Map<String, Object>{
-                    'products' => WebStoreService.getCatalog()
+                    'products' => WebStoreService.getCatalog(),
+                    'delivery' => DeliveryRules.forWeb()
                 });
             } else if (path.contains('/verify-code')) {
                 // Resolve a client's login code to their account. Returns
