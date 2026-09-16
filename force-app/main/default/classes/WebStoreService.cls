@@ -21,6 +21,10 @@ public without sharing class WebStoreService {
     // client from placing new ones on the website.
     public static final Integer OVERDUE_DAYS = 45;
 
+    // Website prices are before GST; every web order line carries it on the
+    // products (never on delivery). Must match Sale_Line_Item__c.GST_Amount__c.
+    public static final Decimal GST_RATE = 0.05;
+
     /** One unpaid order that is past the OVERDUE_DAYS limit. */
     public class OverdueSale {
         public String  saleId;
@@ -52,6 +56,9 @@ public without sharing class WebStoreService {
         public String name;           // contact person
         public String businessName;   // shop / business (optional)
         public String address;        // delivery address
+        public String pincode;        // 6-digit delivery PIN code
+        public List<String> districts; // India Post districts for the PIN code
+        public String state;          // India Post state for the PIN code
         public String gstin;          // optional
         public String note;           // optional customer note
         public String orderRef;       // idempotency key from the website
@@ -81,7 +88,8 @@ public without sharing class WebStoreService {
         public String  accountName;
         public Boolean newCustomer;
         public String  status;        // Pending Approval | Confirmed
-        public Decimal total;
+        public Decimal total;         // products with GST + delivery charge
+        public Decimal deliveryCharge;
         public Boolean duplicate;     // true when orderRef already processed
     }
 
@@ -283,7 +291,8 @@ public without sharing class WebStoreService {
         if (a == null) throw new WebStoreException('Please log in again.');
 
         List<Sale__c> rows = [
-            SELECT Id, Name, Order_Status__c, Total_Revenue__c, Client__c,
+            SELECT Id, Name, Order_Status__c, Order_Total__c, Client__c,
+                   Delivery_Zone__c, Delivery_Charge__c,
                    Client__r.Name, Client__r.Phone,
                    Client__r.Unique_Business_Code__c
             FROM Sale__c
@@ -311,7 +320,7 @@ public without sharing class WebStoreService {
         OrderEditResult r = new OrderEditResult();
         r.saleName = sale.Name;
         r.status   = 'Cancelled';
-        r.total    = sale.Total_Revenue__c;
+        r.total    = sale.Order_Total__c;
         r.returnedForApproval = false;
         return r;
     }
@@ -330,7 +339,7 @@ public without sharing class WebStoreService {
 
         List<Sale_Line_Item__c> lines = [
             SELECT Id, Sale__c, Brand__c, Packet_Type__c, Quantity__c,
-                   Rate_Per_Kg__c
+                   Rate_Per_Kg__c, GST_Applied__c
             FROM Sale_Line_Item__c
             WHERE Sale__c = :sale.Id
         ];
@@ -361,7 +370,7 @@ public without sharing class WebStoreService {
                 requestedKg.put(li.Brand__c + '|' + li.Packet_Type__c,
                     kg + zeroIfNull(requestedKg.get(
                         li.Brand__c + '|' + li.Packet_Type__c)));
-                newTotal += kg * zeroIfNull(li.Rate_Per_Kg__c);
+                newTotal += lineAmount(kg, li);
                 continue;
             }
             if (packets < 0)
@@ -379,7 +388,7 @@ public without sharing class WebStoreService {
             li.Quantity__c = kg;
             toUpdate.add(li);
             requestedKg.put(key, kg + zeroIfNull(requestedKg.get(key)));
-            newTotal += kg * zeroIfNull(li.Rate_Per_Kg__c);
+            newTotal += lineAmount(kg, li);
         }
 
         if (toUpdate.isEmpty() && toDelete.isEmpty())
@@ -387,6 +396,18 @@ public without sharing class WebStoreService {
         if (toDelete.size() == lines.size())
             throw new WebStoreException(
                 'An order needs at least one item. Cancel it instead.');
+
+        // The PIN code's minimums still hold after a change, and the
+        // delivery charge follows the new weight.
+        Map<String, Decimal> kgByBrand = new Map<String, Decimal>();
+        for (String key : requestedKg.keySet()) {
+            String brand = key.substringBefore('|');
+            kgByBrand.put(brand, zeroIfNull(kgByBrand.get(brand)) + requestedKg.get(key));
+        }
+        DeliveryRules.Quote delivery = DeliveryRules.quote(sale.Delivery_Zone__c, kgByBrand);
+        if (!delivery.shortfalls.isEmpty())
+            throw new WebStoreException(DeliveryRules.shortfallMessage(delivery));
+        newTotal += delivery.charge;
 
         // Availability already counts this sale's own lines as blocked, so
         // add them back before comparing — otherwise the order competes with
@@ -410,8 +431,12 @@ public without sharing class WebStoreService {
         try {
             if (!toUpdate.isEmpty()) update toUpdate;
             if (!toDelete.isEmpty()) delete toDelete;
+            if (zeroIfNull(sale.Delivery_Charge__c) != delivery.charge
+                && String.isNotBlank(sale.Delivery_Zone__c)) {
+                update new Sale__c(Id = sale.Id, Delivery_Charge__c = delivery.charge);
+            }
 
-            Decimal oldTotal = zeroIfNull(sale.Total_Revenue__c);
+            Decimal oldTotal = zeroIfNull(sale.Order_Total__c);
             Boolean grewALot = sale.Order_Status__c == 'Confirmed'
                 && oldTotal > 0
                 && newTotal > oldTotal * REAPPROVAL_GROWTH;
@@ -463,6 +488,12 @@ public without sharing class WebStoreService {
 
     private static Decimal zeroIfNull(Decimal d) {
         return d == null ? 0 : d;
+    }
+
+    /** Mirrors Sale_Line_Item__c.Line_Amount__c: quantity × rate, plus GST when applied. */
+    private static Decimal lineAmount(Decimal kg, Sale_Line_Item__c li) {
+        Decimal base = kg * zeroIfNull(li.Rate_Per_Kg__c);
+        return li.GST_Applied__c == true ? base * (1 + GST_RATE) : base;
     }
 
     /**
@@ -568,12 +599,21 @@ public without sharing class WebStoreService {
             throw new WebStoreException('A valid 10-digit phone number is required.');
         if (coded == null && String.isBlank(input.name))
             throw new WebStoreException('Customer name is required.');
+        // Website builds from before PIN codes send none: those orders keep
+        // the old pricing (product GST flag, no delivery rules) until the
+        // new website is live. Queued retries of such orders take this path too.
+        String pincode = input.pincode == null ? '' : input.pincode.trim();
+        Boolean pincodeRules = String.isNotBlank(pincode);
+        if (pincodeRules
+            && (!Pattern.matches('[1-9][0-9]{5}', pincode) || String.isBlank(input.state)))
+            throw new WebStoreException(
+                'Enter the 6-digit PIN code of the delivery address.');
 
         // Idempotency: same orderRef → return the existing sale
         if (String.isNotBlank(input.orderRef)) {
             List<Sale__c> existing = [
-                SELECT Id, Name, Order_Status__c, Total_Revenue__c,
-                       Client__c, Client__r.Name
+                SELECT Id, Name, Order_Status__c, Order_Total__c,
+                       Delivery_Charge__c, Client__c, Client__r.Name
                 FROM Sale__c WHERE Web_Order_Ref__c = :input.orderRef
                 LIMIT 1
             ];
@@ -584,7 +624,8 @@ public without sharing class WebStoreService {
                 dup.accountId   = existing[0].Client__c;
                 dup.accountName = existing[0].Client__r?.Name;
                 dup.status      = existing[0].Order_Status__c;
-                dup.total       = existing[0].Total_Revenue__c;
+                dup.total       = existing[0].Order_Total__c;
+                dup.deliveryCharge = existing[0].Delivery_Charge__c;
                 dup.newCustomer = false;
                 dup.duplicate   = true;
                 return dup;
@@ -627,6 +668,18 @@ public without sharing class WebStoreService {
             requestedKg.put(key,
                 (requestedKg.containsKey(key) ? requestedKg.get(key) : 0) + kg);
         }
+        Map<String, Decimal> kgByBrand = new Map<String, Decimal>();
+        for (String key : requestedKg.keySet()) {
+            String brand = key.substringBefore('|');
+            kgByBrand.put(brand,
+                (kgByBrand.containsKey(brand) ? kgByBrand.get(brand) : 0) + requestedKg.get(key));
+        }
+        DeliveryRules.Quote delivery = DeliveryRules.quote(
+            pincodeRules ? DeliveryRules.zoneFor(input.districts, input.state) : null,
+            kgByBrand);
+        if (!delivery.shortfalls.isEmpty())
+            throw new WebStoreException(DeliveryRules.shortfallMessage(delivery));
+
         for (String key : requestedKg.keySet()) {
             Decimal have = availableKg.containsKey(key) ? availableKg.get(key) : 0;
             if (requestedKg.get(key) > have) {
@@ -685,6 +738,9 @@ public without sharing class WebStoreService {
                 Payment_Method__c  = paymentMethodOf(input.paymentMethod),
                 Web_Order_Ref__c   = left(input.orderRef, 64),
                 Delivery_Address__c = left(input.address, 1000),
+                Delivery_Pincode__c = pincodeRules ? pincode : null,
+                Delivery_Zone__c   = delivery.zone,
+                Delivery_Charge__c = delivery.charge,
                 Notes_Remarks__c   = left(input.note, 255)
             );
             insert sale;
@@ -695,14 +751,15 @@ public without sharing class WebStoreService {
                 Web_Product__c p = productBySlug.get(it.slug);
                 Decimal qtyKg = (it.packets * p.Pack_Size_Grams__c / 1000)
                                 .setScale(3);
-                total += qtyKg * p.Price_Per_Kg__c;
+                Boolean gst = pincodeRules || p.GST_Applied__c;
+                total += qtyKg * p.Price_Per_Kg__c * (gst ? 1 + GST_RATE : 1);
                 lines.add(new Sale_Line_Item__c(
                     Sale__c         = sale.Id,
                     Brand__c        = p.Brand__c,
                     Packet_Type__c  = p.Packet_Type__c,
                     Quantity__c     = qtyKg,
                     Rate_Per_Kg__c  = p.Price_Per_Kg__c,
-                    GST_Applied__c  = p.GST_Applied__c
+                    GST_Applied__c  = gst
                 ));
             }
             insert lines;   // trigger validates stock + fires WhatsApp/alerts
@@ -718,7 +775,8 @@ public without sharing class WebStoreService {
             res.accountName = client.Name;
             res.newCustomer = isNew;
             res.status      = status;
-            res.total       = total.setScale(2);
+            res.deliveryCharge = delivery.charge;
+            res.total       = (total + delivery.charge).setScale(2);
             res.duplicate   = false;
             return res;
 
@@ -745,9 +803,9 @@ public without sharing class WebStoreService {
         for (Sale__c s : [
             SELECT Id, Name, Sale_Date__c, Order_Status__c,
                    Payment_Status__c, Payment_Method__c,
-                   Total_Revenue__c, Total_Collected__c,
+                   Order_Total__c, Total_Collected__c,
                    Balance_Due__c, Expected_Delivery_Date__c,
-                   Web_Order_Ref__c,
+                   Web_Order_Ref__c, Delivery_Charge__c, Delivery_Pincode__c,
                    (SELECT Id, Brand__c, Packet_Type__c, Quantity__c,
                            Rate_Per_Kg__c, Packet_Count__c, Line_Amount__c
                     FROM Sale_Line_Items__r)
@@ -779,7 +837,9 @@ public without sharing class WebStoreService {
                 'status'        => s.Order_Status__c,
                 'paymentStatus' => s.Payment_Status__c,
                 'paymentMethod' => s.Payment_Method__c,
-                'total'         => s.Total_Revenue__c,
+                'total'         => s.Order_Total__c,
+                'deliveryCharge' => s.Delivery_Charge__c,
+                'deliveryPincode' => s.Delivery_Pincode__c,
                 'collected'     => s.Total_Collected__c,
                 'balanceDue'    => s.Balance_Due__c,
                 'expectedDelivery' => s.Expected_Delivery_Date__c != null
@@ -806,7 +866,7 @@ public without sharing class WebStoreService {
         if (String.isBlank(orderRef)) return null;
         List<Sale__c> rows = [
             SELECT Id, Name, Order_Status__c, Payment_Method__c,
-                   Payment_Status__c, Total_Revenue__c, Total_Collected__c,
+                   Payment_Status__c, Order_Total__c, Total_Collected__c,
                    Balance_Due__c
             FROM Sale__c WHERE Web_Order_Ref__c = :orderRef LIMIT 1
         ];
@@ -819,13 +879,50 @@ public without sharing class WebStoreService {
             'status'        => s.Order_Status__c,
             'paymentMethod' => s.Payment_Method__c,
             'paymentStatus' => s.Payment_Status__c,
-            'total'         => s.Total_Revenue__c,
+            'total'         => s.Order_Total__c,
             'collected'     => s.Total_Collected__c,
             'balanceDue'    => bal,
             'paid'          => s.Order_Status__c != 'Cancelled'
                                && (s.Total_Collected__c != null
                                    && s.Total_Collected__c > 0)
                                && bal <= 0
+        };
+    }
+
+    /**
+     * Balance of one of a LOGGED-IN client's own orders, by sale id — used
+     * to poll while a custom (often partial) payment against that specific
+     * order is in flight from the orders page.
+     *
+     * Ownership is checked by code, not by trusting the sale id, same as
+     * ownedSale — but unlike ownedSale this does not gate on
+     * CUSTOMER_EDITABLE: a Delivered order is exactly the common case that
+     * still owes money and must stay payable after delivery.
+     *
+     * Null on a bad code or a sale that is not this client's own, so the
+     * website cannot use this to probe whether some other sale id exists.
+     */
+    public static Map<String, Object> getOrderBalance(String businessCode, Id saleId) {
+        Account a = findClientByCode(businessCode);
+        if (a == null || saleId == null) return null;
+
+        List<Sale__c> rows = [
+            SELECT Id, Name, Order_Status__c, Order_Total__c,
+                   Total_Collected__c, Balance_Due__c
+            FROM Sale__c
+            WHERE Id = :saleId AND Client__c = :a.Id
+            LIMIT 1
+        ];
+        if (rows.isEmpty()) return null;
+
+        Sale__c s = rows[0];
+        return new Map<String, Object>{
+            'saleId'     => s.Id,
+            'saleName'   => s.Name,
+            'status'     => s.Order_Status__c,
+            'total'      => s.Order_Total__c,
+            'collected'  => s.Total_Collected__c,
+            'balanceDue' => s.Balance_Due__c == null ? 0 : s.Balance_Due__c
         };
     }
 
@@ -912,7 +1009,7 @@ public without sharing class WebStoreService {
         if (clientId == null) return out;
         Date cutoff = Date.today().addDays(-OVERDUE_DAYS);
         for (Sale__c s : [
-            SELECT Id, Name, Sale_Date__c, Total_Revenue__c, Balance_Due__c
+            SELECT Id, Name, Sale_Date__c, Order_Total__c, Balance_Due__c
             FROM Sale__c
             WHERE Client__c = :clientId
             AND Order_Status__c = 'Delivered'
@@ -924,7 +1021,7 @@ public without sharing class WebStoreService {
             o.saleId     = s.Id;
             o.saleName   = s.Name;
             o.saleDate   = String.valueOf(s.Sale_Date__c);
-            o.total      = s.Total_Revenue__c;
+            o.total      = s.Order_Total__c;
             o.balanceDue = s.Balance_Due__c;
             o.daysOld    = s.Sale_Date__c.daysBetween(Date.today());
             out.add(o);

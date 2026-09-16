@@ -194,6 +194,26 @@
         <editable>true</editable>
         <readable>true</readable>
     </fieldPermissions>
+    <fieldPermissions>
+        <field>Sale__c.Delivery_Pincode__c</field>
+        <editable>true</editable>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Sale__c.Delivery_Zone__c</field>
+        <editable>true</editable>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Sale__c.Delivery_Charge__c</field>
+        <editable>true</editable>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Sale__c.Order_Total__c</field>
+        <editable>false</editable>
+        <readable>true</readable>
+    </fieldPermissions>
     <pageAccesses>
         <apexPage>PaymentReceiptPDF</apexPage>
         <enabled>true</enabled>

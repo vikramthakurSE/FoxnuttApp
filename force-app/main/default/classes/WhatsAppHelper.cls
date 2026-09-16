@@ -500,7 +500,7 @@ public class WhatsAppHelper {
             if (String.isBlank(s.Client__r?.Phone)) continue;
 
             String status = s.Order_Status__c;
-            Decimal rev   = s.Total_Revenue__c    != null ? s.Total_Revenue__c    : 0;
+            Decimal rev   = s.Order_Total__c      != null ? s.Order_Total__c      : 0;
             Decimal col   = s.Total_Collected__c  != null ? s.Total_Collected__c  : 0;
             Decimal bal   = s.Balance_Due__c      != null ? s.Balance_Due__c      : 0;
             Boolean paid  = isSettled(col, bal);

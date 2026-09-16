@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Default_Min_Kg__c</fullName>
+    <description>Outside the local districts, each brand in the order must reach this many KG unless Delivery Brand Minimum sets its own.</description>
+    <externalId>false</externalId>
+    <fieldManageability>SubscriberControlled</fieldManageability>
+    <inlineHelpText>Outside the local districts, each brand in the order must reach this many KG unless Delivery Brand Minimum sets its own.</inlineHelpText>
+    <label>Default Minimum KG per Brand</label>
+    <precision>8</precision>
+    <scale>2</scale>
+    <required>false</required>
+    <type>Number</type>
+</CustomField>

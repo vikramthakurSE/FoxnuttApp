@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Charge_Per_Kg__c</fullName>
+    <description>Rupees per KG of the whole order, charged only outside the home state. No GST is added to it.</description>
+    <externalId>false</externalId>
+    <fieldManageability>SubscriberControlled</fieldManageability>
+    <inlineHelpText>Rupees per KG of the whole order, charged only outside the home state. No GST is added to it.</inlineHelpText>
+    <label>Delivery Charge per KG</label>
+    <precision>8</precision>
+    <scale>2</scale>
+    <required>false</required>
+    <type>Number</type>
+</CustomField>

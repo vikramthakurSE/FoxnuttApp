@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Delivery_Charge__c</fullName>
+    <description>Delivery charge on top of the products, without GST. Counted in Order Total, Balance Due and Payment Status.</description>
+    <externalId>false</externalId>
+    <label>Delivery Charge</label>
+    <precision>16</precision>
+    <required>false</required>
+    <scale>2</scale>
+    <trackTrending>false</trackTrending>
+    <type>Currency</type>
+</CustomField>

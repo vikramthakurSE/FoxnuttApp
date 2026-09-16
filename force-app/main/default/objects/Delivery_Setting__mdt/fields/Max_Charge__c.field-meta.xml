@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Max_Charge__c</fullName>
+    <description>Cap in rupees on the delivery charge. Leave blank for no cap.</description>
+    <externalId>false</externalId>
+    <fieldManageability>SubscriberControlled</fieldManageability>
+    <inlineHelpText>Cap in rupees on the delivery charge. Leave blank for no cap.</inlineHelpText>
+    <label>Maximum Delivery Charge</label>
+    <precision>8</precision>
+    <scale>2</scale>
+    <required>false</required>
+    <type>Number</type>
+</CustomField>

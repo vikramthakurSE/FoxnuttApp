@@ -3,10 +3,11 @@
  * Consumed server-to-server by the Next.js backend via a Connected App
  * (OAuth 2.0 Client Credentials flow) — never called from the browser.
  *
- *   GET  /services/apexrest/store/v1/catalog          → product catalog + availability
+ *   GET  /services/apexrest/store/v1/catalog          → product catalog + availability + delivery rules
  *   GET  /services/apexrest/store/v1/orders?phone=... → order history for a phone
  *   GET  /services/apexrest/store/v1/payment-due?code=… → old unpaid orders blocking checkout
  *   GET  /services/apexrest/store/v1/order-payment?ref=… → payment state of one web order
+ *   GET  /services/apexrest/store/v1/order-balance?code=…&saleId=… → balance of one of a client's own orders
  *   GET  /services/apexrest/store/v1/addresses?code=…    → a client's saved delivery addresses
  *   GET  /services/apexrest/store/v1/receipt?ref=…       → PDF receipt for one web order
  *   GET  /services/apexrest/store/v1/receipt?ref=…       → PDF receipt for one web order
@@ -24,7 +25,8 @@ global with sharing class WebStoreAPI {
             String path = req.requestURI.toLowerCase();
             if (path.endsWith('/catalog')) {
                 respond(res, 200, new Map<String, Object>{
-                    'products' => WebStoreService.getCatalog()
+                    'products' => WebStoreService.getCatalog(),
+                    'delivery' => DeliveryRules.forWeb()
                 });
             } else if (path.contains('/verify-code')) {
                 // Resolve a client's login code to their account. Returns
@@ -85,6 +87,17 @@ global with sharing class WebStoreAPI {
                 } else {
                     pay.put('found', true);
                     respond(res, 200, pay);
+                }
+            } else if (path.contains('/order-balance')) {
+                // Ownership-checked by code, so this cannot be used to probe
+                // whether some other sale id exists or what it owes.
+                Map<String, Object> bal = WebStoreService.getOrderBalance(
+                    req.params.get('code'), (Id) req.params.get('saleId'));
+                if (bal == null) {
+                    respond(res, 200, new Map<String, Object>{ 'found' => false });
+                } else {
+                    bal.put('found', true);
+                    respond(res, 200, bal);
                 }
             } else if (path.contains('/addresses')) {
                 // Saved delivery addresses for checkout's pick-list.

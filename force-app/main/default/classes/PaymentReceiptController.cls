@@ -42,6 +42,7 @@ public with sharing class PaymentReceiptController {
         List<Sale__c> rows = [
             SELECT Id, Name, Sale_Date__c, Order_Status__c, Payment_Method__c,
                    Payment_Status__c, Total_Revenue__c, Total_Collected__c,
+                   Order_Total__c, Delivery_Charge__c,
                    Balance_Due__c, Delivery_Address__c,
                    Client__r.Name, Client__r.Contact_Person__c,
                    Client__r.Phone, Client__r.Unique_Business_Code__c
