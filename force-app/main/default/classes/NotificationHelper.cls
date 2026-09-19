@@ -71,6 +71,21 @@ public class NotificationHelper {
         );
     }
 
+    // ── A paid order was cancelled: someone has to send the money back ────
+    public static void notifyRefundDue(List<Sale__c> sales) {
+        for (Sale__c s : sales) {
+            Decimal amt = s.Refund_Amount__c == null ? 0 : s.Refund_Amount__c;
+            send(
+                TYPE_PAYMENT,
+                'Refund due: ₹' + amt.setScale(0).format() + ' · ' + s.Name,
+                (s.Client__r?.Name == null ? 'A client' : s.Client__r.Name) +
+                ' cancelled a paid order. Send the refund within 24–48 hrs, ' +
+                'then set Refund Status to Refunded.',
+                s.Id
+            );
+        }
+    }
+
     // ════════════════════════════════════════════════════════════════════════
     // 1. NEW SALE CREATED — called from SaleLineItemHelper after line items saved
     // ════════════════════════════════════════════════════════════════════════

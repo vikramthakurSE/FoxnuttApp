@@ -1,4 +1,4 @@
-trigger SaleTrigger on Sale__c (after insert, after update, before delete) {
+trigger SaleTrigger on Sale__c (before update, after insert, after update, before delete) {
 
     // New sale WhatsApp + notification fired from SaleLineItemHelper.onInsert
     // (line items needed for product details)
@@ -10,7 +10,15 @@ trigger SaleTrigger on Sale__c (after insert, after update, before delete) {
         SaleLineItemHelper.onSaleDelete(Trigger.old);
     }
 
+    // Cancelled orders that hold payments owe a refund; see SaleRefundHelper.
+    if (Trigger.isBefore && Trigger.isUpdate) {
+        SaleRefundHelper.beforeUpdate(Trigger.new, Trigger.oldMap);
+    }
+
     if (Trigger.isAfter && Trigger.isUpdate) {
+
+        // Refund due → staff notification; refund sent → client WhatsApp.
+        SaleRefundHelper.afterUpdate(Trigger.new, Trigger.oldMap);
 
         Set<Id> deliveredNow   = new Set<Id>();
         Set<Id> undeliveredNow = new Set<Id>();
