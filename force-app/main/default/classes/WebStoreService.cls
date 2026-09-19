@@ -806,6 +806,7 @@ public without sharing class WebStoreService {
                    Order_Total__c, Total_Collected__c,
                    Balance_Due__c, Expected_Delivery_Date__c,
                    Web_Order_Ref__c, Delivery_Charge__c, Delivery_Pincode__c,
+                   Refund_Status__c, Refund_Amount__c, Refunded_On__c,
                    (SELECT Id, Brand__c, Packet_Type__c, Quantity__c,
                            Rate_Per_Kg__c, Packet_Count__c, Line_Amount__c
                     FROM Sale_Line_Items__r)
@@ -842,6 +843,11 @@ public without sharing class WebStoreService {
                 'deliveryPincode' => s.Delivery_Pincode__c,
                 'collected'     => s.Total_Collected__c,
                 'balanceDue'    => s.Balance_Due__c,
+                // Cancelled orders that held payments: Pending or Refunded.
+                'refundStatus'  => s.Refund_Status__c,
+                'refundAmount'  => s.Refund_Amount__c,
+                'refundedOn'    => s.Refunded_On__c == null
+                                   ? null : String.valueOf(s.Refunded_On__c),
                 'expectedDelivery' => s.Expected_Delivery_Date__c != null
                                       ? String.valueOf(s.Expected_Delivery_Date__c)
                                       : null,

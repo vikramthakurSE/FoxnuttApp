@@ -45,6 +45,26 @@
         <viewAllRecords>true</viewAllRecords>
     </objectPermissions>
     <fieldPermissions>
+        <field>Sale__c.Refund_Status__c</field>
+        <editable>true</editable>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Sale__c.Refund_Amount__c</field>
+        <editable>true</editable>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Sale__c.Refunded_On__c</field>
+        <editable>true</editable>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Sale__c.Refund_Reference__c</field>
+        <editable>true</editable>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
         <field>Sale__c.Payment_Method__c</field>
         <editable>true</editable>
         <readable>true</readable>

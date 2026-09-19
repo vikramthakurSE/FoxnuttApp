@@ -330,17 +330,58 @@ public class WhatsAppHelper {
     // 5. ORDER CANCELLED
     // Template: order_cancelled
     // {{1}} name, {{2}} order#
+    // An order that holds payments uses order_cancelled_refund instead —
+    // {{1}} name, {{2}} order#, {{3}} refund amount — telling the client the
+    // money comes back within 24–48 hours. Until Meta approves that template
+    // (#132001) the plain order_cancelled message goes out.
     // ════════════════════════════════════════════════════════════════════════
     @future(callout=true)
     public static void sendOrderCancelled(
         String phone, String clientName, String saleName,
-        String businessCode
+        String businessCode, String refundAmount
+    ) {
+        String p = fmtPhone(phone);
+        if (p == null) return;
+        String std = buildPayloadWithTextHeader(
+            p, 'order_cancelled', hdr(businessCode),
+            new List<String>{ clientName, saleName });
+        if (String.isNotBlank(refundAmount)) {
+            sendPaidOrStandard(buildPayloadWithTextHeader(
+                p, 'order_cancelled_refund', hdr(businessCode),
+                new List<String>{ clientName, saleName, refundAmount }), std);
+        } else {
+            sendMessage(std);
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // 5a. REFUND PROCESSED — staff set Refund Status to Refunded
+    // Template: refund_processed — header {{1}} login code
+    // Body {{1}} name, {{2}} refund amount, {{3}} order#, {{4}} reference
+    // ════════════════════════════════════════════════════════════════════════
+    @future(callout=true)
+    public static void sendRefundProcessed(
+        String phone, String clientName, String amount,
+        String saleName, String reference, String businessCode
     ) {
         String p = fmtPhone(phone);
         if (p == null) return;
         sendMessage(buildPayloadWithTextHeader(
-            p, 'order_cancelled', hdr(businessCode),
-            new List<String>{ clientName, saleName }));
+            p, 'refund_processed', hdr(businessCode),
+            new List<String>{ clientName, amount, saleName,
+                              String.isBlank(reference) ? '-' : reference }));
+    }
+
+    public static void dispatchRefundProcessed(List<Sale__c> sales) {
+        for (Sale__c s : sales) {
+            if (String.isBlank(s.Client__r?.Phone)) continue;
+            Decimal amt = s.Refund_Amount__c != null ? s.Refund_Amount__c : 0;
+            sendRefundProcessed(
+                s.Client__r.Phone, s.Client__r.Name,
+                amt.setScale(0).format(), s.Name, s.Refund_Reference__c,
+                s.Client__r.Unique_Business_Code__c
+            );
+        }
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -524,7 +565,8 @@ public class WhatsAppHelper {
             } else if (status == 'Cancelled') {
                 sendOrderCancelled(
                     s.Client__r.Phone, s.Client__r.Name, s.Name,
-                    s.Client__r.Unique_Business_Code__c
+                    s.Client__r.Unique_Business_Code__c,
+                    col > 0 ? col.setScale(0).format() : null
                 );
             }
         }
