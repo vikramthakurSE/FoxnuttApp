@@ -542,7 +542,8 @@ public without sharing class WebStoreService {
         for (Web_Product__c p : [
             SELECT Id, Name, Slug__c, Brand__c, Packet_Type__c, Grade__c,
                    Description__c, Pack_Size_Grams__c, Price_Per_Kg__c,
-                   Price_Per_Packet__c, Pack_Label__c, Min_Order_Packets__c,
+                   Price_Per_Packet__c, MRP_Per_Packet__c,
+                   Pack_Label__c, Min_Order_Packets__c,
                    Badge__c, GST_Applied__c, Sort_Order__c
             FROM Web_Product__c
             WHERE Is_Active__c = true
@@ -566,6 +567,11 @@ public without sharing class WebStoreService {
                 'packLabel'        => p.Pack_Label__c,
                 'pricePerKg'       => p.Price_Per_Kg__c,
                 'pricePerPacket'   => p.Price_Per_Packet__c,
+                // Printed MRP, struck through on the website. Only when it
+                // is actually above the selling price.
+                'mrpPerPacket'     => p.MRP_Per_Packet__c != null
+                                      && p.MRP_Per_Packet__c > p.Price_Per_Packet__c
+                                      ? p.MRP_Per_Packet__c : null,
                 'minOrderPackets'  => p.Min_Order_Packets__c != null
                                       ? p.Min_Order_Packets__c : 1,
                 'badge'            => p.Badge__c,
