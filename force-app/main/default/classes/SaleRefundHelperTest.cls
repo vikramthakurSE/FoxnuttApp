@@ -61,6 +61,34 @@ private class SaleRefundHelperTest {
     }
 
     @isTest
+    static void markRefundedFromTheClientViewRecordsAndGuards() {
+        Sale__c s = paidSale(400);
+        update new Sale__c(Id = s.Id, Order_Status__c = 'Cancelled');
+
+        Test.startTest();
+        AccountClientController.markRefunded(s.Id, ' 612345678901 ', '2026-09-20');
+        Sale__c after = reload(s.Id);
+        System.assertEquals('Refunded', after.Refund_Status__c);
+        System.assertEquals(400, after.Refund_Amount__c);
+        System.assertEquals(Date.newInstance(2026, 9, 20), after.Refunded_On__c);
+        System.assertEquals('612345678901', after.Refund_Reference__c);
+
+        // Marking it twice is refused.
+        Boolean blocked = false;
+        try { AccountClientController.markRefunded(s.Id, null, null); }
+        catch (AuraHandledException e) { blocked = true; }
+        System.assert(blocked, 'A second refund should be refused');
+
+        // A live order cannot be refunded.
+        Sale__c live = paidSale(100);
+        Boolean refusedLive = false;
+        try { AccountClientController.markRefunded(live.Id, null, null); }
+        catch (AuraHandledException e) { refusedLive = true; }
+        Test.stopTest();
+        System.assert(refusedLive, 'Only cancelled orders can be refunded');
+    }
+
+    @isTest
     static void orderHistoryCarriesTheRefund() {
         Sale__c s = paidSale(250);
         update new Sale__c(Id = s.Id, Order_Status__c = 'Cancelled');
