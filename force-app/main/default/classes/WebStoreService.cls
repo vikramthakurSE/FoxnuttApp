@@ -21,9 +21,18 @@ public without sharing class WebStoreService {
     // client from placing new ones on the website.
     public static final Integer OVERDUE_DAYS = 45;
 
-    // Website prices are before GST; every web order line carries it on the
-    // products (never on delivery). Must match Sale_Line_Item__c.GST_Amount__c.
+    // Website prices INCLUDE GST: what the customer sees on the product page
+    // is what they pay. The order line stores the net-of-tax rate so
+    // Sale_Line_Item__c.GST_Amount__c adds the tax back to that same figure,
+    // keeping the tax split right for invoices. GST is on products only,
+    // never on delivery.
     public static final Decimal GST_RATE = 0.05;
+
+    /** Net-of-tax rate behind a GST-inclusive catalogue price. */
+    public static Decimal netRate(Decimal priceIncludingGst) {
+        if (priceIncludingGst == null) return 0;
+        return (priceIncludingGst / (1 + GST_RATE)).setScale(2, RoundingMode.HALF_UP);
+    }
 
     /** One unpaid order that is past the OVERDUE_DAYS limit. */
     public class OverdueSale {
@@ -758,13 +767,17 @@ public without sharing class WebStoreService {
                 Decimal qtyKg = (it.packets * p.Pack_Size_Grams__c / 1000)
                                 .setScale(3);
                 Boolean gst = pincodeRules || p.GST_Applied__c;
-                total += qtyKg * p.Price_Per_Kg__c * (gst ? 1 + GST_RATE : 1);
+                // The catalogue price already includes GST, so the line
+                // carries the net rate and the tax is added back on top of
+                // it — the customer pays exactly the listed price.
+                Decimal rate = gst ? netRate(p.Price_Per_Kg__c) : p.Price_Per_Kg__c;
+                total += qtyKg * rate * (gst ? 1 + GST_RATE : 1);
                 lines.add(new Sale_Line_Item__c(
                     Sale__c         = sale.Id,
                     Brand__c        = p.Brand__c,
                     Packet_Type__c  = p.Packet_Type__c,
                     Quantity__c     = qtyKg,
-                    Rate_Per_Kg__c  = p.Price_Per_Kg__c,
+                    Rate_Per_Kg__c  = rate,
                     GST_Applied__c  = gst
                 ));
             }
