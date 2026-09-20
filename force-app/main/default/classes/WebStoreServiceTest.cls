@@ -82,7 +82,7 @@ private class WebStoreServiceTest {
 
         System.assertEquals(true, res.newCustomer);
         System.assertEquals('Pending Approval', res.status);
-        System.assertEquals(1260.00, res.total); // 1 KG @ 1200 + 5% GST
+        System.assertEquals(1200.00, res.total); // 1 KG @ 1200, GST included
 
         Account acc = [SELECT Name, Phone_Digits__c, AccountSource,
                               Contact_Person__c
@@ -102,7 +102,8 @@ private class WebStoreServiceTest {
         System.assertEquals('web-ref-001', sale.Web_Order_Ref__c);
         System.assertEquals(1, sale.Sale_Line_Items__r.size());
         System.assertEquals(1.000, sale.Sale_Line_Items__r[0].Quantity__c);
-        System.assertEquals(1200, sale.Sale_Line_Items__r[0].Rate_Per_Kg__c);
+        // 1200 includes GST, so the line keeps the net rate: 1200 / 1.05
+        System.assertEquals(1142.86, sale.Sale_Line_Items__r[0].Rate_Per_Kg__c);
         // Cost snapshotted from inventory by the existing trigger
         System.assertEquals(900, sale.Sale_Line_Items__r[0].Cost_Per_Kg__c);
     }
@@ -341,7 +342,7 @@ private class WebStoreServiceTest {
         Map<String, Object> pay = WebStoreService.getOrderPayment('web-ref-online');
         System.assertEquals(res.saleName, pay.get('saleName'));
         System.assertEquals(false, pay.get('paid'));
-        System.assertEquals(630, pay.get('balanceDue')); // 0.5 KG @ 1200 + 5% GST
+        System.assertEquals(600, pay.get('balanceDue')); // 0.5 KG @ 1200, GST included
         System.assertEquals(null, WebStoreService.getOrderPayment('nope'));
 
         RestContext.request  = new RestRequest();
@@ -550,7 +551,8 @@ private class WebStoreServiceTest {
                      FROM Sale__c WHERE Id = :res.saleId];
         System.assertEquals('Home State', s.Delivery_Zone__c);
         System.assertEquals(0, s.Delivery_Charge__c);
-        System.assertEquals(10080, s.Order_Total__c);   // 8 KG @ 1200 + 5% GST
+        // 8 KG @ 1200 incl. GST; the 2-decimal net rate leaves a few paise.
+        System.assert(Math.abs(s.Order_Total__c - 9600) < 0.10, s.Order_Total__c);
     }
 
     @isTest
@@ -560,7 +562,7 @@ private class WebStoreServiceTest {
         WebStoreService.OrderResult small = WebStoreService.placeOrder(
             outsideInput('web-ref-chn', 48, 'TAMIL NADU', 'CHENNAI'));    // 12 KG
         System.assertEquals(60, small.deliveryCharge);
-        System.assertEquals(15120 + 60, small.total);
+        System.assert(Math.abs(small.total - (14400 + 60)) < 0.10, small.total);
 
         DeliveryRules.Quote capped = DeliveryRules.quote(
             DeliveryRules.ZONE_OTHER_STATE,
@@ -569,7 +571,7 @@ private class WebStoreServiceTest {
         System.assert(capped.shortfalls.isEmpty());
 
         Sale__c s = [SELECT Balance_Due__c, Payment_Status__c FROM Sale__c WHERE Id = :small.saleId];
-        System.assertEquals(15180, s.Balance_Due__c);
+        System.assert(Math.abs(s.Balance_Due__c - 14460) < 0.10, s.Balance_Due__c);
         System.assertEquals('Unpaid', s.Payment_Status__c);
     }
 
@@ -618,7 +620,7 @@ private class WebStoreServiceTest {
 
         Sale__c s = [SELECT Delivery_Charge__c, Order_Total__c FROM Sale__c WHERE Id = :res.saleId];
         System.assertEquals(50, s.Delivery_Charge__c);
-        System.assertEquals(12600 + 50, r.total);
-        System.assertEquals(12650, s.Order_Total__c);
+        System.assert(Math.abs(r.total - (12000 + 50)) < 0.10, r.total);
+        System.assert(Math.abs(s.Order_Total__c - 12050) < 0.10, s.Order_Total__c);
     }
 }
