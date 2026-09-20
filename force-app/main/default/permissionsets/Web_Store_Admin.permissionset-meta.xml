@@ -155,6 +155,11 @@
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
+        <field>Web_Product__c.MRP_Per_Packet__c</field>
+        <editable>true</editable>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
         <field>Web_Product__c.Pack_Label__c</field>
         <editable>true</editable>
         <readable>true</readable>

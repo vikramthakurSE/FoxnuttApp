@@ -1,5 +1,57 @@
 <template>
 
+    <!-- REFUND MODAL -->
+    <template if:true={isRefundOpen}>
+        <div class="modal-backdrop" onclick={closeRefundModal}></div>
+        <div class="modal-sheet">
+            <div class="modal-handle"></div>
+            <div class="modal-header pay-modal-header">
+                <div class="modal-title-wrap">
+                    <div class="modal-title">Mark Refunded</div>
+                    <div class="modal-sub">
+                        {refundSaleName} &middot; Refund: &#8377;{refundAmount}
+                    </div>
+                </div>
+                <button class="modal-close" onclick={closeRefundModal}>&#10005;</button>
+            </div>
+            <div class="modal-body">
+                <div class="refund-note">
+                    Send the money back over UPI first, then record it here.
+                    The client gets a WhatsApp confirmation straight away.
+                </div>
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label class="form-label">Refund Amount (&#8377;)</label>
+                        <input type="text" class="form-input" value={refundAmount} disabled>
+                        <div class="form-hint">What the client paid on this order</div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Date Sent *</label>
+                        <input type="date" class="form-input"
+                            value={refundDate} onchange={onRefundDate}>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">UPI Reference / UTR — optional</label>
+                    <input type="text" class="form-input"
+                        value={refundRef} placeholder="e.g. 612345678901"
+                        onchange={onRefundRef}>
+                    <div class="form-hint">Included in the client's WhatsApp</div>
+                </div>
+                <template if:true={refundError}>
+                    <div class="form-error">{refundError}</div>
+                </template>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-cancel" onclick={closeRefundModal}>Cancel</button>
+                <button class="modal-save pay-save-btn"
+                    onclick={handleRefundSave} disabled={isRefundSaving}>
+                    {refundSaveLabel}
+                </button>
+            </div>
+        </div>
+    </template>
+
     <!-- PAYMENT MODAL — at top for mobile visibility -->
     <template if:true={isPaymentOpen}>
         <div class="modal-backdrop" onclick={closePaymentModal}></div>
@@ -428,6 +480,33 @@
                                 </template>
                             </div>
 
+                            <!-- Refund on a cancelled order -->
+                            <template if:true={sale.refundDone}>
+                                <div class="refund-row">
+                                    <span class="refund-badge badge-refunded">
+                                        &#10003; Refunded &#8377;{sale.refundAmountDisplay}
+                                    </span>
+                                    <span class="refund-meta">
+                                        <template if:true={sale.refundedOnDisplay}>
+                                            on {sale.refundedOnDisplay}
+                                        </template>
+                                        <template if:true={sale.refundReference}>
+                                            &middot; {sale.refundReference}
+                                        </template>
+                                    </span>
+                                </div>
+                            </template>
+                            <template if:true={sale.refundPending}>
+                                <div class="refund-row">
+                                    <span class="refund-badge badge-refund-pending">
+                                        Refund due &#8377;{sale.refundAmountDisplay}
+                                    </span>
+                                    <span class="refund-meta">
+                                        Send it back within 24&ndash;48 hrs, then mark it below.
+                                    </span>
+                                </div>
+                            </template>
+
                             <!-- Line Items -->
                             <template if:true={sale.hasLineItems}>
                                 <div class="li-section">
@@ -584,9 +663,18 @@
                                     </button>
                                 </template>
                                 <template if:true={sale.isCancelled}>
-                                    <div class="action-btn cancelled-btn">
-                                        &#128683; Cancelled
-                                    </div>
+                                    <template if:true={sale.refundPending}>
+                                        <button class="action-btn refund-btn"
+                                            data-id={sale.Id}
+                                            onclick={openRefund}>
+                                            &#8634; Mark Refunded
+                                        </button>
+                                    </template>
+                                    <template if:false={sale.refundPending}>
+                                        <div class="action-btn cancelled-btn">
+                                            &#128683; Cancelled
+                                        </div>
+                                    </template>
                                 </template>
                                 <button class="action-btn view-btn"
                                     data-id={sale.Id}

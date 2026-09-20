@@ -9,6 +9,7 @@ import getFollowUpStatus from '@salesforce/apex/AccountClientController.getFollo
 import saveFollowUp      from '@salesforce/apex/AccountClientController.saveFollowUp';
 import saveSendOrderFollowUp from '@salesforce/apex/AccountClientController.saveSendOrderFollowUp';
 import updateSaleStatus from '@salesforce/apex/AccountClientController.updateSaleStatus';
+import markRefunded     from '@salesforce/apex/AccountClientController.markRefunded';
 import getInventory     from '@salesforce/apex/QuickSaleController.getInventory';
 import getPicklistValues from '@salesforce/apex/QuickSaleController.getPicklistValues';
 import saveSale         from '@salesforce/apex/QuickSaleController.saveSale';
@@ -274,6 +275,14 @@ export default class AccountClientView extends NavigationMixin(LightningElement)
                     : '—'
             }));
 
+            // Refunds: a cancelled order that still holds money owes one.
+            // Orders cancelled before refund tracking have no Refund Status,
+            // so fall back to what was collected.
+            const refundOwed = (s.Refund_Amount__c != null
+                ? s.Refund_Amount__c
+                : (os === 'Cancelled' ? (s.Total_Collected__c || 0) : 0)) || 0;
+            const refundDone = s.Refund_Status__c === 'Refunded';
+
             const saleDate = s.Sale_Date__c
                 ? new Date(s.Sale_Date__c + 'T00:00:00')
                     .toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'2-digit' })
@@ -310,6 +319,14 @@ export default class AccountClientView extends NavigationMixin(LightningElement)
                 payments,
                 hasPayments:         payments.length > 0,
                 isCancelled:         os === 'Cancelled',
+                refundDone,
+                refundPending:       os === 'Cancelled' && !refundDone && refundOwed > 0,
+                refundAmountDisplay: refundOwed.toFixed(2),
+                refundReference:     s.Refund_Reference__c || '',
+                refundedOnDisplay:   s.Refunded_On__c
+                    ? new Date(s.Refunded_On__c + 'T00:00:00')
+                        .toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'2-digit' })
+                    : '',
                 isNotDelivered:      os !== 'Delivered' && os !== 'Cancelled',
                 statusDisplay:       os === 'Cancelled' ? 'Cancelled' : ps,
                 statusLocked:        isLocked,
@@ -523,6 +540,65 @@ export default class AccountClientView extends NavigationMixin(LightningElement)
         .catch(err => {
             this.isPaymentSaving = false;
             this.paymentError = err.body?.message || 'Save failed.';
+        });
+    }
+
+    // ── Refund Modal ───────────────────────────────────────
+    @track isRefundOpen   = false;
+    @track isRefundSaving = false;
+    @track refundSaleId   = '';
+    @track refundSaleName = '';
+    @track refundAmount   = '0.00';
+    @track refundDate     = new Date().toISOString().split('T')[0];
+    @track refundRef      = '';
+    @track refundError    = '';
+
+    get refundSaveLabel() { return this.isRefundSaving ? 'Saving...' : '\u2713 Mark Refunded'; }
+
+    openRefund(e) {
+        const saleId = e.currentTarget.dataset.id;
+        const sale = this.sales.find(s => s.Id === saleId);
+        if (!sale) return;
+        this.refundSaleId   = saleId;
+        this.refundSaleName = sale.Name;
+        this.refundAmount   = sale.refundAmountDisplay;
+        this.refundDate     = new Date().toISOString().split('T')[0];
+        this.refundRef      = '';
+        this.refundError    = '';
+        this.isRefundOpen   = true;
+        this._scrollToTop();
+    }
+
+    closeRefundModal() { this.isRefundOpen = false; }
+    onRefundDate(e)    { this.refundDate = e.target.value; }
+    onRefundRef(e)     { this.refundRef  = e.target.value; }
+
+    handleRefundSave() {
+        this.refundError = '';
+        if (!this.refundDate) { this.refundError = 'Select the date you sent the refund.'; return; }
+
+        this.isRefundSaving = true;
+        markRefunded({
+            saleId:     this.refundSaleId,
+            reference:  this.refundRef || '',
+            refundDate: this.refundDate
+        })
+        .then(() => {
+            this.isRefundSaving = false;
+            this.isRefundOpen   = false;
+            return refreshApex(this.wiredSalesResult);
+        })
+        .then(() => {
+            this.dispatchEvent(new ShowToastEvent({
+                title:   'Refund Recorded',
+                message: '\u20b9' + this.refundAmount +
+                         ' marked as refunded — the client has been messaged on WhatsApp.',
+                variant: 'success'
+            }));
+        })
+        .catch(err => {
+            this.isRefundSaving = false;
+            this.refundError = err.body?.message || 'Could not save the refund.';
         });
     }
 

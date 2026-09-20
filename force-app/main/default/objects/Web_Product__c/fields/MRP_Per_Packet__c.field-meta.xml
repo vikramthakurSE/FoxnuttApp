@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>MRP_Per_Packet__c</fullName>
+    <description>Printed MRP of one packet. The website strikes this through next to the selling price. Leave blank for no strike-through.</description>
+    <inlineHelpText>Printed MRP per packet, e.g. 550. Leave blank if the product has no MRP to show.</inlineHelpText>
+    <label>MRP Per Packet</label>
+    <precision>18</precision>
+    <required>false</required>
+    <scale>2</scale>
+    <trackTrending>false</trackTrending>
+    <type>Currency</type>
+</CustomField>
