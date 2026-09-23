@@ -322,6 +322,15 @@
     color: #9ca3af;
 }
 /* WhatsApp follow-up opt-out toggle */
+.wa-toggle-wrap {
+    margin: 0 12px 16px;
+    background: #fff;
+    border-radius: 14px;
+    padding: 16px;
+    box-shadow: 0 1px 6px rgba(0,0,0,.07);
+    border-left: 4px solid #16a34a;
+}
+.wa-toggle-wrap .wa-toggle-hint { margin-bottom: 0; }
 .wa-toggle {
     width: 100%;
     display: flex;

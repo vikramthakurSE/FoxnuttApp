@@ -7,6 +7,8 @@ import getAccountData   from '@salesforce/apex/AccountClientController.getAccoun
 import savePayment      from '@salesforce/apex/AccountClientController.savePayment';
 import updateSaleStatus from '@salesforce/apex/AccountClientController.updateSaleStatus';
 import markRefunded     from '@salesforce/apex/AccountClientController.markRefunded';
+import getSendOrderFollowUp  from '@salesforce/apex/AccountClientController.getSendOrderFollowUp';
+import saveSendOrderFollowUp from '@salesforce/apex/AccountClientController.saveSendOrderFollowUp';
 import getInventory     from '@salesforce/apex/QuickSaleController.getInventory';
 import getPicklistValues from '@salesforce/apex/QuickSaleController.getPicklistValues';
 import saveSale         from '@salesforce/apex/QuickSaleController.saveSale';
@@ -75,9 +77,58 @@ export default class AccountClientView extends NavigationMixin(LightningElement)
             if (!document.hidden && this.wiredSalesResult) refreshApex(this.wiredSalesResult);
         };
         document.addEventListener('visibilitychange', this._visHandler);
+        this.loadSendOrderFollowUp();
     }
     disconnectedCallback() {
         document.removeEventListener('visibilitychange', this._visHandler);
+    }
+
+    // ── WhatsApp follow-up per-client opt-out ─────────────────────────────
+    loadSendOrderFollowUp() {
+        if (!this.recordId) return;
+        getSendOrderFollowUp({ accountId: this.recordId })
+            .then(result => {
+                this.sendOrderFollowUp = result !== false;
+            })
+            .catch(() => {});
+    }
+
+    get waToggleClass() {
+        return this.sendOrderFollowUp
+            ? 'wa-toggle wa-toggle-on'
+            : 'wa-toggle wa-toggle-off';
+    }
+    get waToggleLabel() {
+        return this.sendOrderFollowUp
+            ? 'WhatsApp follow-ups: ON'
+            : 'WhatsApp follow-ups: OFF';
+    }
+
+    toggleSendOrderFollowUp() {
+        if (this.isWaToggleSaving) return;
+        const next = !this.sendOrderFollowUp;
+        this.isWaToggleSaving = true;
+        saveSendOrderFollowUp({ accountId: this.recordId, enabled: next })
+            .then(() => {
+                this.isWaToggleSaving = false;
+                this.sendOrderFollowUp = next;
+                this.dispatchEvent(new ShowToastEvent({
+                    title: next
+                        ? 'WhatsApp follow-ups ON'
+                        : 'WhatsApp follow-ups OFF',
+                    message: next
+                        ? 'This client will get the 21-day re-order reminder.'
+                        : 'This client will not get re-order reminders on WhatsApp.',
+                    variant: 'success'
+                }));
+            })
+            .catch(err => {
+                this.isWaToggleSaving = false;
+                this.dispatchEvent(new ShowToastEvent({
+                    title: 'Error', variant: 'error',
+                    message: err.body?.message || 'Could not update.'
+                }));
+            });
     }
 
     processSales(rawSales) {
@@ -314,6 +365,8 @@ export default class AccountClientView extends NavigationMixin(LightningElement)
     @track paymentBy       = '';
     @track paymentRef      = '';
     @track paymentError    = '';
+    @track sendOrderFollowUp = true;
+    @track isWaToggleSaving  = false;
     @track cdPercentage    = '';
     @track cdAmount        = '0.00';
     @track cashToCollect   = '0.00';

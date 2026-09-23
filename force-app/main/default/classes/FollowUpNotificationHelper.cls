@@ -152,8 +152,8 @@ public class FollowUpNotificationHelper {
     }
 
     // Sends only the WhatsApp order re-order reminder to clients whose last
-    // delivery was 21+ days ago. Goes out Wednesday & Sunday only. The team
-    // push notification and per-client opt-out/pause were removed.
+    // delivery was 21+ days ago. Goes out Wednesday & Sunday only, and skips
+    // any client whose Send_Order_FollowUp__c opt-out is turned off.
     private static void sendSalesFollowUpReminders(
         Date today,
         Date cutoff,
@@ -164,12 +164,22 @@ public class FollowUpNotificationHelper {
         ).format('EEEE');
         if (dayName != 'Wednesday' && dayName != 'Sunday') return;
 
+        Map<Id, Account> accountMap = new Map<Id, Account>([
+            SELECT Id, Send_Order_FollowUp__c
+            FROM Account
+            WHERE Id IN :data.lastDeliveryDateByClient.keySet()
+        ]);
+
         for (Id clientId : data.lastDeliveryDateByClient.keySet()) {
             Date lastDate = data.lastDeliveryDateByClient.get(clientId);
             Sale__c s = data.lastSaleByClient.get(clientId);
             if (lastDate == null || s == null) continue;
             if (lastDate > cutoff) continue;
             if (String.isBlank(s.Client__r.Phone)) continue;
+
+            // Per-client opt-out
+            Account acc = accountMap.get(clientId);
+            if (acc != null && acc.Send_Order_FollowUp__c == false) continue;
 
             WhatsAppHelper.dispatchOrderFollowUp(
                 s.Client__r.Phone, s.Client__r.Name, lastDate.format(),

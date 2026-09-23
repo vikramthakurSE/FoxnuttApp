@@ -359,6 +359,20 @@
             </button>
         </div>
 
+        <!-- WHATSAPP FOLLOW-UP OPT-OUT -->
+        <div class="wa-toggle-wrap">
+            <button class={waToggleClass}
+                onclick={toggleSendOrderFollowUp}
+                disabled={isWaToggleSaving}>
+                <span class="wa-toggle-dot"></span>
+                <span class="wa-toggle-text">{waToggleLabel}</span>
+            </button>
+            <div class="wa-toggle-hint">
+                Automated 21-day "no order" reminder sent to this client on
+                WhatsApp (Wed &amp; Sun). Turn off to stop it for this client.
+            </div>
+        </div>
+
         <!-- SECTION HEAD -->
         <div class="section-head">
             <div class="section-title">Sales</div>

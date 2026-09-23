@@ -113,4 +113,20 @@ public with sharing class AccountClientController {
         );
     }
 
+    // Whether this client currently receives the WhatsApp order follow-up.
+    @AuraEnabled(cacheable=false)
+    public static Boolean getSendOrderFollowUp(Id accountId) {
+        Account a = [
+            SELECT Send_Order_FollowUp__c
+            FROM Account WHERE Id = :accountId LIMIT 1
+        ];
+        return a.Send_Order_FollowUp__c;
+    }
+
+    // Toggle the per-client WhatsApp order follow-up on/off.
+    @AuraEnabled
+    public static void saveSendOrderFollowUp(Id accountId, Boolean enabled) {
+        update new Account(Id = accountId, Send_Order_FollowUp__c = enabled);
+    }
+
 }
