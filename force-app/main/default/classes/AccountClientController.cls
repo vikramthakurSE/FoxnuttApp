@@ -129,4 +129,18 @@ public with sharing class AccountClientController {
         update new Account(Id = accountId, Send_Order_FollowUp__c = enabled);
     }
 
+    // Default every Client to receiving the WhatsApp follow-up. A newly
+    // (re)created checkbox leaves existing records unchecked, so this sets
+    // them ON; safe to re-run (only touches records currently false).
+    public static Integer backfillOrderFollowUpDefaults() {
+        List<Account> toFix = [
+            SELECT Id FROM Account
+            WHERE RecordType.Name = 'Client'
+            AND Send_Order_FollowUp__c = false
+        ];
+        for (Account a : toFix) a.Send_Order_FollowUp__c = true;
+        if (!toFix.isEmpty()) update toFix;
+        return toFix.size();
+    }
+
 }
