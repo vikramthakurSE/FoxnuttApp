@@ -5,9 +5,6 @@ import { getRecord, getFieldValue } from 'lightning/uiRecordApi';
 import { refreshApex } from '@salesforce/apex';
 import getAccountData   from '@salesforce/apex/AccountClientController.getAccountData';
 import savePayment      from '@salesforce/apex/AccountClientController.savePayment';
-import getFollowUpStatus from '@salesforce/apex/AccountClientController.getFollowUpStatus';
-import saveFollowUp      from '@salesforce/apex/AccountClientController.saveFollowUp';
-import saveSendOrderFollowUp from '@salesforce/apex/AccountClientController.saveSendOrderFollowUp';
 import updateSaleStatus from '@salesforce/apex/AccountClientController.updateSaleStatus';
 import markRefunded     from '@salesforce/apex/AccountClientController.markRefunded';
 import getInventory     from '@salesforce/apex/QuickSaleController.getInventory';
@@ -78,120 +75,9 @@ export default class AccountClientView extends NavigationMixin(LightningElement)
             if (!document.hidden && this.wiredSalesResult) refreshApex(this.wiredSalesResult);
         };
         document.addEventListener('visibilitychange', this._visHandler);
-        this.loadFollowUpStatus();
     }
     disconnectedCallback() {
         document.removeEventListener('visibilitychange', this._visHandler);
-    }
-
-    loadFollowUpStatus() {
-        if (!this.recordId) return;
-        getFollowUpStatus({ accountId: this.recordId })
-            .then(result => {
-                this.followUp        = result.followUp      || false;
-                this.followUpNotes   = result.followUpNotes || '';
-                this.followUpHistory = result.followUpHistory || '';
-                this.followUpDate    = result.followUpDate
-                    ? new Date(result.followUpDate + 'T00:00:00')
-                        .toLocaleDateString('en-IN', {
-                            day: '2-digit', month: 'short', year: '2-digit'
-                        })
-                    : '';
-                // default ON when the field has never been set
-                this.sendOrderFollowUp =
-                    result.sendOrderFollowUp !== false;
-            })
-            .catch(() => {});
-    }
-
-    get waToggleClass() {
-        return this.sendOrderFollowUp
-            ? 'wa-toggle wa-toggle-on'
-            : 'wa-toggle wa-toggle-off';
-    }
-    get waToggleLabel() {
-        return this.sendOrderFollowUp
-            ? 'WhatsApp follow-ups: ON'
-            : 'WhatsApp follow-ups: OFF';
-    }
-
-    toggleSendOrderFollowUp() {
-        if (this.isWaToggleSaving) return;
-        const next = !this.sendOrderFollowUp;
-        this.isWaToggleSaving = true;
-        saveSendOrderFollowUp({ accountId: this.recordId, enabled: next })
-            .then(() => {
-                this.isWaToggleSaving = false;
-                this.sendOrderFollowUp = next;
-                this.dispatchEvent(new ShowToastEvent({
-                    title: next
-                        ? 'WhatsApp follow-ups ON'
-                        : 'WhatsApp follow-ups OFF',
-                    message: next
-                        ? 'This client will get the 21-day order reminder.'
-                        : 'This client will not get order reminders on WhatsApp.',
-                    variant: 'success'
-                }));
-            })
-            .catch(err => {
-                this.isWaToggleSaving = false;
-                this.dispatchEvent(new ShowToastEvent({
-                    title: 'Error', variant: 'error',
-                    message: err.body?.message || 'Could not update.'
-                }));
-            });
-    }
-
-    onFollowUpToggle()   { this.followUp = !this.followUp; }
-    onFollowUpNotes(e)   { this.followUpNotes = e.target.value; }
-
-    saveFollowUpHandler() {
-        const nextFollowUp = !this.followUp;
-        this.isFollowUpSaving = true;
-        saveFollowUp({
-            accountId: this.recordId,
-            followUp:  nextFollowUp,
-            notes:     this.followUpNotes || ''
-        })
-        .then(() => {
-            this.isFollowUpSaving = false;
-            this.followUp = nextFollowUp;
-            this.dispatchEvent(new ShowToastEvent({
-                title:   nextFollowUp ? 'Follow Up Marked ✓' : 'Follow Up Cleared',
-                message: nextFollowUp
-                    ? 'Reminders paused for 1 week.'
-                    : 'Daily reminders will resume.',
-                variant: 'success'
-            }));
-            this.loadFollowUpStatus();
-        })
-        .catch(err => {
-            this.isFollowUpSaving = false;
-            this.dispatchEvent(new ShowToastEvent({
-                title: 'Error', variant: 'error',
-                message: err.body?.message || 'Could not save.'
-            }));
-        });
-    }
-
-    get followUpBtnLabel() {
-        return this.isFollowUpSaving ? 'Saving...'
-             : this.followUp ? '✓ Followed Up'
-             : 'Mark as Followed Up';
-    }
-    get followUpBtnClass() {
-        return this.followUp
-            ? 'followup-btn followup-active'
-            : 'followup-btn';
-    }
-    get hasFollowUpHistory() {
-        return this.followUpHistory && this.followUpHistory.length > 0;
-    }
-    get followUpHistoryLines() {
-        if (!this.followUpHistory) return [];
-        return this.followUpHistory.split('\n')
-            .filter(l => l.trim().length > 0)
-            .map((l, i) => ({ key: i, text: l }));
     }
 
     processSales(rawSales) {
@@ -428,14 +314,6 @@ export default class AccountClientView extends NavigationMixin(LightningElement)
     @track paymentBy       = '';
     @track paymentRef      = '';
     @track paymentError    = '';
-    // Follow Up
-    @track followUp          = false;
-    @track followUpNotes     = '';
-    @track followUpDate      = '';
-    @track followUpHistory   = '';
-    @track isFollowUpSaving  = false;
-    @track sendOrderFollowUp = true;
-    @track isWaToggleSaving  = false;
     @track cdPercentage    = '';
     @track cdAmount        = '0.00';
     @track cashToCollect   = '0.00';

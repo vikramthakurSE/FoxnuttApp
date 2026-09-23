@@ -1,7 +1,6 @@
 public class FollowUpNotificationHelper {
 
     private static final Integer FOLLOW_UP_AGE_DAYS = 21;
-    private static final Integer FOLLOW_UP_PAUSE_DAYS = 7;
 
     private class ClientDeliveryData {
         Map<Id, Date> lastDeliveryDateByClient = new Map<Id, Date>();
@@ -11,28 +10,18 @@ public class FollowUpNotificationHelper {
     }
 
     // Entry point - runs daily at 9 AM from FollowUpScheduler.
+    // Sends the WhatsApp order re-order reminder (order_followup_reminder)
+    // on Wednesdays & Sundays to clients whose last delivery was 21+ days
+    // ago. The internal "Follow Up" tracking + team push notification were
+    // removed; only the WhatsApp reminder to clients remains.
     public static void sendFollowUpReminders() {
         Date today = Date.today();
         Date cutoff = today.addDays(-FOLLOW_UP_AGE_DAYS);
 
-        autoClearFollowUpFlags(today);
-
         ClientDeliveryData data = getClientDeliveryData();
         if (data.lastSaleByClient.isEmpty()) return;
 
-        Set<Id> clientIds = data.lastSaleByClient.keySet();
-        Map<Id, Account> accountMap = new Map<Id, Account>([
-            SELECT Id, Follow_Up__c, Send_Order_FollowUp__c
-            FROM Account
-            WHERE Id IN :clientIds
-        ]);
-
-        sendSalesFollowUpReminders(
-            today,
-            cutoff,
-            data,
-            accountMap
-        );
+        sendSalesFollowUpReminders(today, cutoff, data);
     }
 
     // Entry point - schedule separately, for example twice a week.
@@ -44,22 +33,6 @@ public class FollowUpNotificationHelper {
         if (data.lastSaleByClient.isEmpty()) return;
 
         sendPaymentCollectionReminders(today, cutoff, data);
-    }
-
-    private static void autoClearFollowUpFlags(Date today) {
-        List<Account> toUncheck = [
-            SELECT Id, Follow_Up__c, Follow_Up_Date__c
-            FROM Account
-            WHERE Follow_Up__c = true
-            AND Follow_Up_Date__c <= :today.addDays(-FOLLOW_UP_PAUSE_DAYS)
-        ];
-
-        for (Account a : toUncheck) {
-            a.Follow_Up__c = false;
-            a.Follow_Up_Date__c = null;
-        }
-
-        if (!toUncheck.isEmpty()) update toUncheck;
     }
 
     private static ClientDeliveryData getClientDeliveryData() {
@@ -178,91 +151,30 @@ public class FollowUpNotificationHelper {
         return notifiedClientIds;
     }
 
+    // Sends only the WhatsApp order re-order reminder to clients whose last
+    // delivery was 21+ days ago. Goes out Wednesday & Sunday only. The team
+    // push notification and per-client opt-out/pause were removed.
     private static void sendSalesFollowUpReminders(
         Date today,
         Date cutoff,
-        ClientDeliveryData data,
-        Map<Id, Account> accountMap
+        ClientDeliveryData data
     ) {
-        // WhatsApp (order_followup_reminder) only goes out Wednesday &
-        // Sunday — push notifications still fire every day below.
         String dayName = Datetime.newInstance(
             today, Time.newInstance(0, 0, 0, 0)
         ).format('EEEE');
-        Boolean sendWhatsAppToday =
-            dayName == 'Wednesday' || dayName == 'Sunday';
-
-        Set<Id> eligibleSaleIds = new Set<Id>();
-        List<Sale__c> toNotify = new List<Sale__c>();
+        if (dayName != 'Wednesday' && dayName != 'Sunday') return;
 
         for (Id clientId : data.lastDeliveryDateByClient.keySet()) {
             Date lastDate = data.lastDeliveryDateByClient.get(clientId);
             Sale__c s = data.lastSaleByClient.get(clientId);
             if (lastDate == null || s == null) continue;
             if (lastDate > cutoff) continue;
+            if (String.isBlank(s.Client__r.Phone)) continue;
 
-            Account acc = accountMap.get(clientId);
-            if (acc != null && acc.Follow_Up__c == true) continue;
-
-            eligibleSaleIds.add(s.Id);
-            toNotify.add(s);
-        }
-
-        if (toNotify.isEmpty()) return;
-
-        Id notifTypeId = getNotificationTypeId('Follow_Up_Reminder');
-        if (notifTypeId == null) {
-            System.debug('Follow_Up_Reminder notification type not found.');
-            return;
-        }
-
-        Set<String> recipientIds = getRecipientIds();
-        if (recipientIds.isEmpty()) return;
-
-        Map<Id, List<Sale_Line_Item__c>> liMap =
-            getSaleLineItems(eligibleSaleIds);
-
-        for (Sale__c s : toNotify) {
-            Date lastDate = data.lastDeliveryDateByClient.get(s.Client__c);
-            Integer daysAgo = lastDate != null
-                ? lastDate.daysBetween(today) : FOLLOW_UP_AGE_DAYS;
-
-            String phone = s.Client__r.Phone != null
-                ? s.Client__r.Phone : 'No phone';
-            String dateStr = lastDate != null ? lastDate.format() : '-';
-            String products = buildProductSummary(liMap.get(s.Id));
-
-            String title = 'Follow up: ' + s.Client__r.Name;
-            String body = s.Client__r.Name +
-                ' - ' + phone +
-                ' - Last order ' + daysAgo + ' days ago on ' + dateStr +
-                ' - ' + products;
-            if (body.length() > 200) body = body.substring(0, 197) + '...';
-
-            Messaging.CustomNotification notif =
-                new Messaging.CustomNotification();
-            notif.setTitle(title);
-            notif.setBody(body);
-            notif.setNotificationTypeId(notifTypeId);
-            notif.setTargetId(s.Client__c);
-
-            try {
-                notif.send(recipientIds);
-            } catch (Exception e) {
-                System.debug('Follow-up failed: ' + e.getMessage());
-            }
-
-            // Per-client opt-out: only WhatsApp clients who still have
-            // "Send WhatsApp Follow-Ups" turned on (default on)
-            Account acc = accountMap.get(s.Client__c);
-            Boolean followUpOn = acc == null || acc.Send_Order_FollowUp__c;
-            if (sendWhatsAppToday && followUpOn
-                    && String.isNotBlank(s.Client__r.Phone)) {
-                WhatsAppHelper.dispatchOrderFollowUp(
-                    s.Client__r.Phone, s.Client__r.Name, dateStr,
-                    s.Client__r.Unique_Business_Code__c
-                );
-            }
+            WhatsAppHelper.dispatchOrderFollowUp(
+                s.Client__r.Phone, s.Client__r.Name, lastDate.format(),
+                s.Client__r.Unique_Business_Code__c
+            );
         }
     }
 
