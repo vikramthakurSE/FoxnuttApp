@@ -6,6 +6,7 @@ public with sharing class PersonFundsController {
         List<Person_Fund__c> funds = [
             SELECT Id, Name, Total_Collected__c,
                    Total_Mfr_Paid__c, Total_Expenses__c,
+                   Total_Withdrawn__c,
                    Available_Funds__c, Last_Updated__c,
                    Opening_Balance_Date__c, Adjustment_Log__c
             FROM Person_Fund__c
@@ -14,8 +15,8 @@ public with sharing class PersonFundsController {
 
         List<Business_Summary__c> summaries = [
             SELECT Id, Total_Collected__c, Total_Mfr_Paid__c,
-                   Total_Expenses__c, Available_Funds__c,
-                   Last_Updated__c
+                   Total_Expenses__c, Total_Withdrawn__c,
+                   Available_Funds__c, Last_Updated__c
             FROM Business_Summary__c
             WHERE Name = 'MAKHANA_SUMMARY'
             LIMIT 1
