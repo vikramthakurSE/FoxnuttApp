@@ -320,10 +320,9 @@ public class SaleLineItemHelper {
             if (!invMap.containsKey(key)) continue;
             Inventory__c inv = invMap.get(key);
             Decimal qty = deductions.get(key);
-            Decimal onHand = inv.Remaining_Quantity__c != null
-                             ? inv.Remaining_Quantity__c : 0;
-            // Floor the figure so stock can never be published as negative
-            inv.Remaining_Quantity__c = Math.max(onHand, onHand - qty);
+            inv.Remaining_Quantity__c = Math.max(0,
+                (inv.Remaining_Quantity__c != null
+                 ? inv.Remaining_Quantity__c : 0) - qty);
             inv.Quantity_Sold__c =
                 (inv.Quantity_Sold__c != null
                  ? inv.Quantity_Sold__c : 0) + qty;
