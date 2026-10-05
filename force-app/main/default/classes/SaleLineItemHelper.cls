@@ -152,8 +152,7 @@ public class SaleLineItemHelper {
     // ════════════════════════════════════════════════════════════════════════
     public static void onStatusDelivered(Set<Id> saleIds) {
         List<Sale_Line_Item__c> lineItems = [
-            SELECT Id, Sale__c, Brand__c, Packet_Type__c, Quantity__c,
-                   Sale__r.Order_Status__c
+            SELECT Id, Sale__c, Brand__c, Packet_Type__c, Quantity__c
             FROM Sale_Line_Item__c
             WHERE Sale__c IN :saleIds
         ];
@@ -162,9 +161,6 @@ public class SaleLineItemHelper {
         Map<String, Decimal> deductions = new Map<String, Decimal>();
         for (Sale_Line_Item__c li : lineItems) {
             if (li.Brand__c == null || li.Quantity__c == null) continue;
-            // Guard against double deduction: if the sale is already
-            // Delivered the stock has been taken out once already.
-            if (li.Sale__r.Order_Status__c == 'Delivered') continue;
             String key = li.Brand__c + '|' + li.Packet_Type__c;
             deductions.put(key,
                 (deductions.containsKey(key)
@@ -324,9 +320,10 @@ public class SaleLineItemHelper {
             if (!invMap.containsKey(key)) continue;
             Inventory__c inv = invMap.get(key);
             Decimal qty = deductions.get(key);
-            inv.Remaining_Quantity__c = Math.max(0,
-                (inv.Remaining_Quantity__c != null
-                 ? inv.Remaining_Quantity__c : 0) - qty);
+            Decimal onHand = inv.Remaining_Quantity__c != null
+                             ? inv.Remaining_Quantity__c : 0;
+            // Floor the figure so stock can never be published as negative
+            inv.Remaining_Quantity__c = Math.max(onHand, onHand - qty);
             inv.Quantity_Sold__c =
                 (inv.Quantity_Sold__c != null
                  ? inv.Quantity_Sold__c : 0) + qty;
